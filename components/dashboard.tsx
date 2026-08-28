@@ -37,7 +37,7 @@ function formatHabitTarget(habit: Habit) {
     return formatMinutesAsTime(habit.target);
   }
   if (habit.unit === "boolean") {
-    return "勾选";
+    return "1";
   }
   if (habit.unit === "minutes") {
     return `${habit.target} 分钟`;
@@ -97,7 +97,9 @@ export function Dashboard({ initialData }: DashboardProps) {
       CATEGORY_ORDER.map((category) => ({
         category,
         label: CATEGORY_LABELS[category],
-        stats: data.habitStats.filter((stat) => stat.category === category),
+        stats: data.habitStats.filter(
+          (stat) => stat.category === category && stat.unit !== "boolean",
+        ),
       })).filter((group) => group.stats.length > 0),
     [data.habitStats],
   );
@@ -442,13 +444,13 @@ export function Dashboard({ initialData }: DashboardProps) {
                                 }}
                                 title={`${day.date} ${record?.completed ? "已完成" : "未完成"}`}
                               >
-                                <span
-                                  className={`matrix-check ${
-                                  record?.completed ? "done" : ""
-                                  }`}
-                                >
-                                  ✓
-                                </span>
+                                <input
+                                  className="matrix-checkbox"
+                                  type="checkbox"
+                                  checked={record?.completed === 1}
+                                  onChange={() => handleToggle(habit, day.date)}
+                                  aria-label={`${day.date} ${habit.name}`}
+                                />
                               </div>
                             );
                           }

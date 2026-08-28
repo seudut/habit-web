@@ -91,11 +91,6 @@ function migrateSchema(db: Database.Database) {
 }
 
 function seedDefaultHabits(db: Database.Database) {
-  const row = db.prepare("SELECT COUNT(*) AS count FROM habits").get() as {
-    count: number;
-  };
-  if (row.count > 0) return;
-
   const defaults: HabitInput[] = [
     {
       name: "早睡",
@@ -126,6 +121,13 @@ function seedDefaultHabits(db: Database.Database) {
       color: "#e15759",
     },
     {
+      name: "持五戒",
+      category: "practice",
+      target: 1,
+      unit: "boolean",
+      color: "#8c6bb1",
+    },
+    {
       name: "文史",
       category: "reading",
       target: 30,
@@ -146,8 +148,22 @@ function seedDefaultHabits(db: Database.Database) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
 
+  const existing = new Set(
+    (
+      db
+        .prepare("SELECT name, category FROM habits")
+        .all() as Array<{ name: string; category: string }>
+    ).map((habit) => `${habit.category}:${habit.name}`),
+  );
+  const orderRow = db
+    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS nextOrder FROM habits")
+    .get() as { nextOrder: number };
+  let nextOrder = orderRow.nextOrder;
+
   const transaction = db.transaction(() => {
-    defaults.forEach((habit, index) => {
+    defaults.forEach((habit) => {
+      if (existing.has(`${habit.category}:${habit.name}`)) return;
+      nextOrder += 1;
       insert.run(
         randomUUID(),
         habit.name,
@@ -155,7 +171,7 @@ function seedDefaultHabits(db: Database.Database) {
         habit.target,
         habit.unit,
         habit.color,
-        index + 1,
+        nextOrder,
       );
     });
   });

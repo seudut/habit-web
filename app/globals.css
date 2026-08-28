@@ -619,6 +619,31 @@ input[type="time"].quick-number {
   color: #fff;
 }
 
+.matrix-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #d7dbe2;
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.matrix-checkbox:checked {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.matrix-checkbox:checked::after {
+  content: "✓";
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .cell-button {
   width: 30px;
   height: 30px;
