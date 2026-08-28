@@ -6,7 +6,7 @@ ARG NO_PROXY
 ENV HTTP_PROXY=${HTTP_PROXY} HTTPS_PROXY=${HTTPS_PROXY} NO_PROXY=${NO_PROXY} \
     http_proxy=${HTTP_PROXY} https_proxy=${HTTPS_PROXY} no_proxy=${NO_PROXY}
 COPY package.json package-lock.json* ./
-RUN npm ci --registry=https://registry.npmmirror.com
+RUN npm ci --ignore-scripts --registry=https://registry.npmmirror.com
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
