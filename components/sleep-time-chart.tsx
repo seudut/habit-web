@@ -60,7 +60,7 @@ export function SleepTimeChart({
       legend: {
         type: "scroll",
         top: 0,
-        data: stats.map((stat) => stat.name),
+        data: ["Goal", ...stats.map((stat) => stat.name)],
         textStyle: { fontSize: 11, color: "#4b5563" },
       },
       grid: { left: 44, right: 20, top: 42, bottom: 32 },
@@ -88,48 +88,49 @@ export function SleepTimeChart({
         max: MAX_DEVIATION,
         interval: 1,
         axisLabel: {
-          formatter: (value: number) => `${value}h`,
           color: "#4b5563",
         },
         axisLine: { show: false },
         axisTick: { show: false },
         splitLine: { show: false },
       },
-      series: stats.map((stat, index) => ({
-        name: stat.name,
-        type: "line",
-        smooth: true,
-        symbol: "none",
-        connectNulls: false,
-        emphasis: { focus: "series" },
-        lineStyle: { width: 2, color: stat.color },
-        itemStyle: { color: stat.color },
-        data: stat.values.map((value) => {
-          if (value <= 0) return null;
-          const deviation = getTimeDeviationHours(
-            stat.name,
-            stat.target,
-            value,
-          );
-          return Math.round(deviation * 10) / 10;
-        }),
-        markLine:
-          index === 0
-            ? {
-                symbol: "none",
-                silent: true,
-                lineStyle: {
-                  type: "dashed",
-                  color: "#94a3b8",
-                  width: 1,
-                },
-                label: {
-                  show: false,
-                },
-                data: [{ yAxis: 0 }],
-              }
-            : undefined,
-      })),
+      series: [
+        {
+          name: "Goal",
+          type: "line" as const,
+          smooth: false,
+          symbol: "none",
+          connectNulls: true,
+          silent: true,
+          lineStyle: {
+            type: "dashed",
+            color: "#94a3b8",
+            width: 1,
+          },
+          itemStyle: { color: "#94a3b8" },
+          data: stats[0]?.values.map(() => 0) ?? [],
+          z: 0,
+        },
+        ...stats.map((stat) => ({
+          name: stat.name,
+          type: "line" as const,
+          smooth: true,
+          symbol: "none",
+          connectNulls: false,
+          emphasis: { focus: "series" as const },
+          lineStyle: { width: 2, color: stat.color },
+          itemStyle: { color: stat.color },
+          data: stat.values.map((value) => {
+            if (value <= 0) return null;
+            const deviation = getTimeDeviationHours(
+              stat.name,
+              stat.target,
+              value,
+            );
+            return Math.round(deviation * 10) / 10;
+          }),
+        })),
+      ],
     }),
     [stats],
   );
