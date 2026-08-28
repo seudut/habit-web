@@ -10,7 +10,7 @@ export function DailyChart({ stats }: { stats: DailyStat[] }) {
     () => ({
       tooltip: {
         trigger: "axis",
-        valueFormatter: (value) => `${value}%`,
+        valueFormatter: (value) => `${value} 分`,
       },
       grid: { left: 44, right: 16, top: 26, bottom: 34 },
       xAxis: {
@@ -28,7 +28,7 @@ export function DailyChart({ stats }: { stats: DailyStat[] }) {
       },
       series: [
         {
-          name: "完成率",
+          name: "综合得分",
           type: "line",
           smooth: true,
           symbol: "circle",
@@ -52,7 +52,7 @@ export function DailyChart({ stats }: { stats: DailyStat[] }) {
           markLine: {
             symbol: "none",
             lineStyle: { type: "dashed", color: "#22a06b" },
-            label: { formatter: "目标 80%", color: "#22a06b" },
+            label: { formatter: "参考线 80", color: "#22a06b" },
             data: [{ yAxis: 80 }],
           },
         },

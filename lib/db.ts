@@ -57,10 +57,37 @@ function createDatabase() {
     );
   `);
 
+  migrateSchema(db);
   seedDefaultHabits(db);
   seedDemoRecords(db);
 
   return db;
+}
+
+function migrateSchema(db: Database.Database) {
+  const version = db
+    .prepare("SELECT value FROM meta WHERE key = 'schema_version'")
+    .get() as { value: string } | undefined;
+  if (version) return;
+
+  const habitsCount = db
+    .prepare("SELECT COUNT(*) AS count FROM habits")
+    .get() as { count: number };
+
+  if (habitsCount.count > 0) {
+    const dbPath = getDatabasePath();
+    const backupPath = `${dbPath}.bak-v1`;
+    if (!fs.existsSync(backupPath)) {
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      fs.copyFileSync(dbPath, backupPath);
+    }
+  }
+
+  db.exec(`
+    DELETE FROM habits;
+    DELETE FROM meta WHERE key = 'demo_seeded';
+    INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '2');
+  `);
 }
 
 function seedDefaultHabits(db: Database.Database) {
@@ -71,39 +98,46 @@ function seedDefaultHabits(db: Database.Database) {
 
   const defaults: HabitInput[] = [
     {
-      name: "早睡 22:30",
+      name: "早睡",
       category: "sleep",
-      target: 1,
-      unit: "boolean",
+      target: 22 * 60 + 30,
+      unit: "time",
       color: "#4e79a7",
     },
     {
-      name: "早起 07:00",
+      name: "早起",
       category: "sleep",
-      target: 1,
-      unit: "boolean",
+      target: 6 * 60 + 30,
+      unit: "time",
       color: "#76b7b2",
     },
     {
-      name: "运动 30 分钟",
-      category: "exercise",
+      name: "站桩",
+      category: "practice",
       target: 30,
       unit: "minutes",
       color: "#f28e2b",
     },
     {
-      name: "阅读 30 分钟",
+      name: "打坐",
+      category: "practice",
+      target: 20,
+      unit: "minutes",
+      color: "#e15759",
+    },
+    {
+      name: "文史",
       category: "reading",
       target: 30,
       unit: "minutes",
       color: "#59a14f",
     },
     {
-      name: "冥想 10 分钟",
-      category: "other",
-      target: 10,
+      name: "哲思",
+      category: "reading",
+      target: 30,
       unit: "minutes",
-      color: "#e15759",
+      color: "#edc948",
     },
   ];
 
@@ -136,8 +170,8 @@ function seedDemoRecords(db: Database.Database) {
   if (seeded) return;
 
   const habits = db
-    .prepare("SELECT id, target, unit FROM habits ORDER BY sort_order")
-    .all() as Pick<Habit, "id" | "target" | "unit">[];
+    .prepare("SELECT id, name, target, unit FROM habits ORDER BY sort_order")
+    .all() as Pick<Habit, "id" | "name" | "target" | "unit">[];
 
   const now = new Date();
   const year = now.getFullYear();
@@ -156,15 +190,32 @@ function seedDemoRecords(db: Database.Database) {
       for (let day = 1; day < todayDay && day <= lastDay; day += 1) {
         const date = `${monthPrefix}-${String(day).padStart(2, "0")}`;
         const hash = hashString(`${habit.id}:${date}`);
+        if (hash % 23 === 0) continue;
 
         if (habit.unit === "boolean") {
-          const completed = hash % 10 < 7 ? 1 : 0;
+          const completed = hash % 7 < 5 ? 1 : 0;
           insert.run(habit.id, date, completed, completed);
           continue;
         }
 
+        if (habit.unit === "time") {
+          const earlyOffsets = [-35, -20, -10, 0, 8, 20, 35, 55, 75, 90];
+          const lateOffsets = [-45, -30, -18, -6, 0, 12, 28, 45, 60];
+          const isSleep = habit.name === "早睡" || habit.name.includes("睡");
+          const offsets = isSleep ? earlyOffsets : lateOffsets;
+          const value =
+            ((habit.target + offsets[hash % offsets.length]) % 1440 + 1440) %
+            1440;
+          const lateMinutes = value - habit.target;
+          const tolerance = isSleep ? 90 : 60;
+          const completed =
+            lateMinutes <= 0 || lateMinutes <= tolerance ? 1 : 0;
+          insert.run(habit.id, date, value, completed);
+          continue;
+        }
+
         const ratios = [0.4, 0.6, 0.8, 1];
-        const ratio = hash % 23 === 0 ? 0 : ratios[hash % ratios.length];
+        const ratio = ratios[hash % ratios.length];
         const value = Math.round(habit.target * ratio * 10) / 10;
         const completed = value >= habit.target * 0.8 && value > 0 ? 1 : 0;
         insert.run(habit.id, date, value, completed);

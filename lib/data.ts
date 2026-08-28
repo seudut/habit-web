@@ -1,4 +1,5 @@
 import { getDatabase } from "./db";
+import { computeHabitScore } from "./scoring";
 import type {
   DayInfo,
   DailyStat,
@@ -65,10 +66,13 @@ export function getMonthData(year: number, month: number): MonthData {
   );
 
   const dailyStats: DailyStat[] = days.map((day) => {
-    const completed = habits.filter(
-      (habit) =>
-        recordMap.get(`${habit.id}:${day.date}`)?.completed === 1,
-    ).length;
+    const scores = habits.map((habit) =>
+      computeHabitScore(
+        habit,
+        recordMap.get(`${habit.id}:${day.date}`),
+      ),
+    );
+    const completed = scores.filter((score) => score >= 80).length;
     const value = habits.reduce(
       (sum, habit) =>
         sum + (recordMap.get(`${habit.id}:${day.date}`)?.value ?? 0),
@@ -80,18 +84,29 @@ export function getMonthData(year: number, month: number): MonthData {
       ...day,
       planned,
       completed,
-      rate: planned > 0 ? Math.round((completed / planned) * 1000) / 10 : 0,
+      rate:
+        planned > 0
+          ? Math.round(
+              (scores.reduce((sum, score) => sum + score, 0) / planned) * 10,
+            ) / 10
+          : 0,
       value: Math.round(value * 10) / 10,
     };
   });
 
   const habitStats: HabitStat[] = habits.map((habit) => {
-    const habitRecords = records.filter(
-      (record) => record.habitId === habit.id,
+    const values = days.map(
+      (day) => recordMap.get(`${habit.id}:${day.date}`)?.value ?? 0,
     );
-    const count = habitRecords.filter((record) => record.completed === 1).length;
+    const scores = values.map((_, index) =>
+      computeHabitScore(
+        habit,
+        recordMap.get(`${habit.id}:${days[index].date}`),
+      ),
+    );
+    const count = scores.filter((score) => score >= 80).length;
     const value = Math.round(
-      habitRecords.reduce((sum, record) => sum + record.value, 0) * 10,
+      values.reduce((sum, item) => sum + item, 0) * 10,
     ) / 10;
 
     return {
@@ -99,11 +114,19 @@ export function getMonthData(year: number, month: number): MonthData {
       name: habit.name,
       category: habit.category,
       color: habit.color,
+      unit: habit.unit,
+      target: habit.target,
+      values,
+      scores,
       count,
       planned: days.length,
       rate:
         days.length > 0
-          ? Math.round((count / days.length) * 1000) / 10
+          ? Math.round(
+              (scores.reduce((sum, score) => sum + score, 0) /
+                days.length) *
+                10,
+            ) / 10
           : 0,
       value,
     };
@@ -115,10 +138,16 @@ export function getMonthData(year: number, month: number): MonthData {
   );
   const target = dailyStats.reduce((sum, stat) => sum + stat.planned, 0);
   const value = dailyStats.reduce((sum, stat) => sum + stat.value, 0);
+  const cellCount = habits.length * days.length;
+  const scoreTotal = habitStats.reduce(
+    (sum, stat) =>
+      sum + stat.scores.reduce((scoreSum, score) => scoreSum + score, 0),
+    0,
+  );
   const perfectDays = dailyStats.filter(
-    (stat) => stat.planned > 0 && stat.completed === stat.planned,
+    (stat) => stat.planned > 0 && stat.rate === 100,
   ).length;
-  const activeDays = dailyStats.filter((stat) => stat.completed > 0).length;
+  const activeDays = dailyStats.filter((stat) => stat.rate > 0).length;
 
   const todayDay = today.startsWith(monthPrefix)
     ? Number(today.slice(8, 10))
@@ -127,7 +156,7 @@ export function getMonthData(year: number, month: number): MonthData {
   const anchorDay = todayDay > 1 ? todayDay - 1 : daysInMonth;
   for (let day = anchorDay; day >= 1; day -= 1) {
     const stat = dailyStats[day - 1];
-    if (stat.completed === stat.planned && stat.planned > 0) {
+    if (stat.rate === 100 && stat.planned > 0) {
       streak += 1;
     } else {
       break;
@@ -138,7 +167,9 @@ export function getMonthData(year: number, month: number): MonthData {
     target,
     completed,
     rate:
-      target > 0 ? Math.round((completed / target) * 1000) / 10 : 0,
+      cellCount > 0
+        ? Math.round((scoreTotal / cellCount) * 10) / 10
+        : 0,
     value: Math.round(value * 10) / 10,
     perfectDays,
     activeDays,

@@ -1,4 +1,4 @@
-export type HabitUnit = "boolean" | "minutes" | "times";
+export type HabitUnit = "boolean" | "minutes" | "times" | "time";
 
 export interface Habit {
   id: string;
@@ -41,6 +41,10 @@ export interface HabitStat {
   name: string;
   category: string;
   color: string;
+  unit: HabitUnit;
+  target: number;
+  values: number[];
+  scores: number[];
   count: number;
   planned: number;
   rate: number;

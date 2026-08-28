@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteHabit, updateHabit } from "@/lib/db";
+import type { HabitUnit } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     name?: string;
     category?: string;
     target?: number;
-    unit?: "boolean" | "minutes" | "times";
+    unit?: HabitUnit;
     color?: string;
   };
 

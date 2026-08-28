@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHabit } from "@/lib/db";
+import type { HabitUnit } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
     name?: string;
     category?: string;
     target?: number;
-    unit?: "boolean" | "minutes" | "times";
+    unit?: HabitUnit;
     color?: string;
   };
 
