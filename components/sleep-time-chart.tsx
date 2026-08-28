@@ -69,6 +69,16 @@ export function SleepTimeChart({
         boundaryGap: false,
         data: stats[0]?.values.map((_, index) => `${index + 1}日`) ?? [],
         axisLabel: { interval: 1 },
+        axisLine: {
+          show: true,
+          lineStyle: { color: "#64748b", width: 1 },
+        },
+        axisTick: {
+          show: true,
+          alignWithLabel: true,
+          lineStyle: { color: "#64748b" },
+        },
+        splitLine: { show: false },
       },
       yAxis: {
         type: "value",
@@ -81,7 +91,9 @@ export function SleepTimeChart({
           formatter: (value: number) => `${value}h`,
           color: "#4b5563",
         },
-        splitLine: { lineStyle: { color: "#f0f1f3" } },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false },
       },
       series: stats.map((stat, index) => ({
         name: stat.name,
@@ -108,15 +120,11 @@ export function SleepTimeChart({
                 silent: true,
                 lineStyle: {
                   type: "dashed",
-                  color: "#9ca3af",
+                  color: "#94a3b8",
                   width: 1,
                 },
                 label: {
-                  show: true,
-                  position: "insideEndTop",
-                  fontSize: 10,
-                  color: "#6b7280",
-                  formatter: "GOAL 0h",
+                  show: false,
                 },
                 data: [{ yAxis: 0 }],
               }
