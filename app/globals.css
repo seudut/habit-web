@@ -412,6 +412,8 @@ input[type="time"].quick-number {
 .matrix-week,
 .matrix-day,
 .matrix-corner,
+.matrix-category,
+.matrix-goal,
 .habit-cell,
 .matrix-cell {
   border-right: 1px solid #f0f1f3;
@@ -444,6 +446,52 @@ input[type="time"].quick-number {
   justify-content: flex-start;
   padding-left: 14px;
   min-height: 46px;
+}
+
+.daily-habit-header {
+  justify-content: center;
+  padding-left: 0;
+}
+
+.matrix-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  background: #f7f9fc;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.matrix-category {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #f7f9fc;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.matrix-goal {
+  position: sticky;
+  left: 174px;
+  z-index: 2;
+  justify-content: center;
+  padding: 0 4px;
+  background: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.goal-header {
+  position: sticky;
+  left: 174px;
+  z-index: 4;
 }
 
 .matrix-week {
@@ -500,7 +548,7 @@ input[type="time"].quick-number {
 
 .habit-cell {
   position: sticky;
-  left: 0;
+  left: 72px;
   z-index: 3;
   background: #fff;
   min-height: 46px;

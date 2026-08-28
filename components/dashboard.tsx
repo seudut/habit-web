@@ -251,8 +251,9 @@ export function Dashboard({ initialData }: DashboardProps) {
   }
 
   const gridStyle: CSSProperties = {
-    gridTemplateColumns: `130px repeat(${data.days.length}, minmax(28px, 1fr))`,
+    gridTemplateColumns: `72px 102px 94px repeat(${data.days.length}, minmax(24px, 1fr))`,
   };
+  let nextMatrixRow = 2;
 
   const today = data.today;
   const isCurrentMonth = today.startsWith(
@@ -317,7 +318,15 @@ export function Dashboard({ initialData }: DashboardProps) {
             ) : (
               <div className="matrix-shell">
                 <div className="habits-grid" style={gridStyle}>
-                  <div className="matrix-corner">习惯 / 日期</div>
+                  <div
+                    className="matrix-corner daily-habit-header"
+                    style={{ gridColumn: "1 / span 2" }}
+                  >
+                    DAILY HABIT
+                  </div>
+                  <div className="matrix-label goal-header" style={{ gridColumn: 3 }}>
+                    GOAL
+                  </div>
                   {data.days.map((day) => (
                     <div
                       className={`matrix-day ${
@@ -336,17 +345,26 @@ export function Dashboard({ initialData }: DashboardProps) {
                   ))}
 
                   {habitGroups.map((group) => {
+                    const groupRowStart = nextMatrixRow;
+                    nextMatrixRow += group.habits.length;
                     return [
                       <div
-                        className="matrix-group"
-                        key={`group-${group.category}`}
+                        className="matrix-category"
+                        key={`category-${group.category}`}
+                        style={{
+                          gridColumn: 1,
+                          gridRow: `${groupRowStart} / span ${group.habits.length}`,
+                        }}
                       >
                         {group.label}
                       </div>,
-                      ...group.habits.flatMap((habit) => [
+                      ...group.habits.map((habit, habitIndex) => {
+                        const row = groupRowStart + habitIndex;
+                        return [
                         <div
                           className="habit-cell"
                           key={`habit-${habit.id}`}
+                          style={{ gridColumn: 2, gridRow: row }}
                         >
                           <span
                             className="habit-dot"
@@ -366,7 +384,14 @@ export function Dashboard({ initialData }: DashboardProps) {
                             ×
                           </button>
                         </div>,
-                        ...data.days.map((day) => {
+                        <div
+                          className="matrix-goal"
+                          key={`goal-${habit.id}`}
+                          style={{ gridColumn: 3, gridRow: row }}
+                        >
+                          {formatHabitTarget(habit)}
+                        </div>,
+                        ...data.days.map((day, dayIndex) => {
                           const record = recordMap.get(
                             getRecordKey(habit.id, day.date),
                           );
@@ -379,6 +404,10 @@ export function Dashboard({ initialData }: DashboardProps) {
                                   isWeekend ? "weekend" : ""
                                 }`}
                                 key={`${habit.id}-${day.date}`}
+                                style={{
+                                  gridColumn: 4 + dayIndex,
+                                  gridRow: row,
+                                }}
                                 title={`${day.date} ${record?.completed ? "已完成" : "未完成"}`}
                               >
                                 <span
@@ -403,13 +432,18 @@ export function Dashboard({ initialData }: DashboardProps) {
                                 isWeekend ? "weekend" : ""
                               }`}
                               key={key}
+                              style={{
+                                gridColumn: 4 + dayIndex,
+                                gridRow: row,
+                              }}
                               title={`${day.date} · ${value || "未记录"}`}
                             >
                               <span className="matrix-display">{value}</span>
                             </div>
                           );
                         }),
-                      ]),
+                        ];
+                      }),
                     ];
                   })}
                 </div>
