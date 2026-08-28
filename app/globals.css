@@ -130,7 +130,10 @@ button {
   align-items: start;
 }
 
-.main-stack,
+.main-stack {
+  display: contents;
+}
+
 .side-stack {
   display: grid;
   gap: 18px;
@@ -143,9 +146,19 @@ button {
   order: -1;
 }
 
-.main-stack {
+.main-stack > .card:nth-child(1) {
   grid-column: 2;
   grid-row: 1;
+}
+
+.main-stack > .card:nth-child(2) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.main-stack > .card:nth-child(3) {
+  grid-column: 1 / -1;
+  grid-row: 3;
 }
 
 .card {
@@ -415,8 +428,10 @@ input[type="time"].quick-number {
 .habits-grid {
   display: grid;
   grid-auto-rows: auto;
-  width: max-content;
-  min-width: max-content;
+  width: 100%;
+  max-width: 1600px;
+  margin-inline: auto;
+  min-width: 0;
 }
 
 .matrix-group,
@@ -672,10 +687,24 @@ input[type="time"].quick-number {
     grid-template-columns: 1fr;
   }
 
-  .main-stack,
   .side-stack {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .main-stack > .card:nth-child(1) {
+    grid-column: auto;
+    grid-row: 2;
+  }
+
+  .main-stack > .card:nth-child(2) {
+    grid-column: auto;
+    grid-row: 3;
+  }
+
+  .main-stack > .card:nth-child(3) {
+    grid-column: auto;
+    grid-row: 4;
   }
 
   .side-stack {
