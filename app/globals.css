@@ -451,6 +451,31 @@ button {
   box-shadow: 0 20px 50px rgb(15 23 42 / 18%);
 }
 
+.habit-modal .card-title h2 {
+  font-size: 14px;
+}
+
+.habit-modal .quick-form {
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.habit-modal .quick-form input,
+.habit-modal .quick-form select {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.habit-modal .primary-button,
+.habit-modal .ghost-button {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.habit-modal .hint {
+  font-size: 11px;
+}
+
 .habit-modal-close {
   width: 30px;
   height: 30px;
@@ -480,6 +505,7 @@ button {
   border-radius: 9px;
   padding: 8px 10px;
   background: #fff;
+  font-size: 12px;
 }
 
 .quick-form input:focus,
