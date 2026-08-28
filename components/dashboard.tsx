@@ -340,7 +340,7 @@ export function Dashboard({ initialData }: DashboardProps) {
             <div className="card-title">
               <h2>月度习惯矩阵</h2>
               <span className="hint">
-                早睡、早起可在矩阵中直接编辑；其余分项请在右侧打卡
+                矩阵中的每日内容可直接编辑，保存后图表自动刷新
               </span>
             </div>
             {data.habits.length === 0 ? (
@@ -455,51 +455,10 @@ export function Dashboard({ initialData }: DashboardProps) {
 
                           const key = getRecordKey(habit.id, day.date);
                           const draft = matrixDrafts[key];
-                          if (habit.unit === "time") {
-                            const value = getRecordDisplayValue(
-                              habit,
-                              record,
-                              draft,
-                            );
-                            return (
-                              <div
-                                className={`matrix-cell ${
-                                  isWeekend ? "weekend" : ""
-                                }`}
-                                key={key}
-                                style={{
-                                  gridColumn: 4 + dayIndex,
-                                  gridRow: row,
-                                }}
-                                title={`${day.date} · ${value || "未记录"}`}
-                              >
-                                <input
-                                  className="cell-time"
-                                  type="time"
-                                  value={value}
-                                  min="00:00"
-                                  max="23:59"
-                                  onChange={(event) =>
-                                    setMatrixDrafts((current) => ({
-                                      ...current,
-                                      [key]: event.target.value,
-                                    }))
-                                  }
-                                  onBlur={(event) =>
-                                    handleMatrixValue(
-                                      habit,
-                                      day.date,
-                                      event.target.value,
-                                    )
-                                  }
-                                />
-                              </div>
-                            );
-                          }
-
                           const value = getRecordDisplayValue(
                             habit,
                             record,
+                            draft,
                           );
                           return (
                             <div
@@ -513,7 +472,34 @@ export function Dashboard({ initialData }: DashboardProps) {
                               }}
                               title={`${day.date} · ${value || "未记录"}`}
                             >
-                              <span className="matrix-display">{value}</span>
+                              <input
+                                className={
+                                  habit.unit === "time"
+                                    ? "cell-time"
+                                    : "cell-number"
+                                }
+                                type={
+                                  habit.unit === "time" ? "time" : "number"
+                                }
+                                min={habit.unit === "time" ? undefined : "0"}
+                                step={
+                                  habit.unit === "time" ? undefined : "1"
+                                }
+                                value={value}
+                                onChange={(event) =>
+                                  setMatrixDrafts((current) => ({
+                                    ...current,
+                                    [key]: event.target.value,
+                                  }))
+                                }
+                                onBlur={(event) =>
+                                  handleMatrixValue(
+                                    habit,
+                                    day.date,
+                                    event.target.value,
+                                  )
+                                }
+                              />
                             </div>
                           );
                         }),
