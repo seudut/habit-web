@@ -291,7 +291,9 @@ export function Dashboard({ initialData }: DashboardProps) {
   }, [data.days]);
 
   const gridStyle: CSSProperties = {
-    gridTemplateColumns: `216px repeat(${data.days.length}, 44px)`,
+    gridTemplateColumns: `216px repeat(${data.days.length}, ${
+      data.habits.some((habit) => habit.unit === "time") ? 64 : 44
+    }px)`,
   };
 
   const today = data.today;

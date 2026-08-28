@@ -558,14 +558,28 @@ input[type="time"].quick-number {
 }
 
 .cell-time {
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   height: 34px;
   border: 0;
   background: transparent;
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: #374151;
+  padding: 0 2px;
+}
+
+.cell-time::-webkit-calendar-picker-indicator,
+.cell-time::-webkit-clear-button,
+.cell-time::-webkit-inner-spin-button,
+.quick-number::-webkit-calendar-picker-indicator,
+.quick-number::-webkit-clear-button,
+.quick-number::-webkit-inner-spin-button {
+  display: none;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .cell-time:focus {
