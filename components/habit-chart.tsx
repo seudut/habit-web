@@ -5,7 +5,13 @@ import type { EChartsOption } from "echarts";
 import type { HabitStat } from "@/lib/types";
 import { EChart } from "./echart";
 
-export function HabitChart({ stats }: { stats: HabitStat[] }) {
+export function HabitChart({
+  stats,
+  height = 320,
+}: {
+  stats: HabitStat[];
+  height?: number;
+}) {
   const option = useMemo<EChartsOption>(
     () => ({
       tooltip: {
@@ -46,5 +52,5 @@ export function HabitChart({ stats }: { stats: HabitStat[] }) {
     [stats],
   );
 
-  return <EChart option={option} height={320} />;
+  return <EChart option={option} height={height} />;
 }

@@ -90,6 +90,16 @@ export function Dashboard({ initialData }: DashboardProps) {
     [data.habits],
   );
 
+  const categoryChartStats = useMemo(
+    () =>
+      CATEGORY_ORDER.map((category) => ({
+        category,
+        label: CATEGORY_LABELS[category],
+        stats: data.habitStats.filter((stat) => stat.category === category),
+      })).filter((group) => group.stats.length > 0),
+    [data.habitStats],
+  );
+
   async function refresh(currentYear: number, currentMonth: number) {
     const response = await fetch(
       `/api/month?year=${currentYear}&month=${currentMonth}`,
@@ -451,13 +461,17 @@ export function Dashboard({ initialData }: DashboardProps) {
             )}
           </section>
 
-          <section className="card">
-            <div className="card-title">
-              <h2>分项每日得分</h2>
-              <span className="hint">每个习惯按日归一化到 0–100，点击图例可筛选</span>
-            </div>
-            <HabitChart stats={data.habitStats} />
-          </section>
+          {categoryChartStats.map((group) => (
+            <section className="card" key={`chart-${group.category}`}>
+              <div className="card-title">
+                <h2>单项完成情况（图表）（{group.label}）</h2>
+                <span className="hint">
+                  每个习惯按日归一化到 0–100，点击图例可筛选
+                </span>
+              </div>
+              <HabitChart stats={group.stats} height={260} />
+            </section>
+          ))}
         </div>
 
         <aside className="side-stack">
