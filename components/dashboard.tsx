@@ -14,6 +14,7 @@ import {
 } from "@/lib/scoring";
 import { DailyChart } from "./daily-chart";
 import { HabitChart } from "./habit-chart";
+import { SleepTimeChart } from "./sleep-time-chart";
 
 const CATEGORY_LABELS: Record<string, string> = {
   sleep: "睡觉",
@@ -466,10 +467,16 @@ export function Dashboard({ initialData }: DashboardProps) {
               <div className="card-title">
                 <h2>单项完成情况（图表）（{group.label}）</h2>
                 <span className="hint">
-                  每个习惯按日归一化到 0–100，点击图例可筛选
+                  {group.category === "sleep"
+                    ? "纵轴为实际时间点，虚线表示目标时间"
+                    : "每个习惯按日归一化到 0–100，点击图例可筛选"}
                 </span>
               </div>
-              <HabitChart stats={group.stats} height={260} />
+              {group.category === "sleep" ? (
+                <SleepTimeChart stats={group.stats} height={280} />
+              ) : (
+                <HabitChart stats={group.stats} height={260} />
+              )}
             </section>
           ))}
         </div>
