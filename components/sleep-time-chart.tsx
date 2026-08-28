@@ -6,7 +6,7 @@ import type { HabitStat } from "@/lib/types";
 import { EChart } from "./echart";
 
 const MIN_DEVIATION = -1;
-const MAX_DEVIATION = 5;
+const MAX_DEVIATION = 3;
 
 function clampDeviation(value: number) {
   return Math.max(MIN_DEVIATION, Math.min(MAX_DEVIATION, value));
@@ -78,12 +78,14 @@ export function SleepTimeChart({
           inside: false,
           length: 8,
           alignWithLabel: true,
+          interval: 0,
           lineStyle: { color: "#334155", width: 1.5 },
         },
         splitLine: { show: false },
         axisLabel: {
-          interval: 1,
+          interval: 0,
           margin: 8,
+          fontSize: 10,
           color: "#4b5563",
         },
       },
