@@ -92,6 +92,7 @@ export function Dashboard({ initialData }: DashboardProps) {
   const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
+  const [habitModalOpen, setHabitModalOpen] = useState(false);
   const [habitForm, setHabitForm] = useState<HabitFormState>({
     name: "",
     category: "sleep",
@@ -244,6 +245,11 @@ export function Dashboard({ initialData }: DashboardProps) {
     });
   }
 
+  function openAddHabitModal() {
+    resetHabitForm();
+    setHabitModalOpen(true);
+  }
+
   function startEditHabit(habit: Habit) {
     setEditingHabitId(habit.id);
     setHabitForm({
@@ -253,6 +259,12 @@ export function Dashboard({ initialData }: DashboardProps) {
       target: getHabitFormTarget(habit),
       color: habit.color,
     });
+    setHabitModalOpen(true);
+  }
+
+  function closeHabitModal() {
+    setHabitModalOpen(false);
+    resetHabitForm();
   }
 
   async function handleSaveHabit(event: FormEvent<HTMLFormElement>) {
@@ -296,6 +308,7 @@ export function Dashboard({ initialData }: DashboardProps) {
     }
 
     resetHabitForm();
+    setHabitModalOpen(false);
     await refresh(year, month);
   }
 
@@ -311,7 +324,7 @@ export function Dashboard({ initialData }: DashboardProps) {
       return;
     }
     if (editingHabitId === habit.id) {
-      resetHabitForm();
+      closeHabitModal();
     }
     await refresh(year, month);
   }
@@ -730,43 +743,70 @@ export function Dashboard({ initialData }: DashboardProps) {
           <section className="card">
             <div className="card-title">
               <h2>管理习惯</h2>
-              <span className="hint">新增、编辑或删除</span>
+              <button
+                className="manager-add-button"
+                onClick={openAddHabitModal}
+              >
+                ＋ 新增
+              </button>
             </div>
 
-            <div className="habit-manager-list">
-              {data.habits.map((habit) => (
-                <div className="habit-manager-item" key={habit.id}>
-                  <span
-                    className="today-dot"
-                    style={{ background: habit.color }}
-                  />
-                  <div className="habit-manager-name">
-                    <strong>{habit.name}</strong>
-                    <small>
-                      {CATEGORY_LABELS[habit.category]} · 目标{" "}
-                      {formatHabitTarget(habit)}
-                    </small>
+            <details className="habit-manager-details">
+              <summary>
+                习惯列表（{data.habits.length}）
+                <span className="details-caret">▾</span>
+              </summary>
+              <div className="habit-manager-list">
+                {data.habits.map((habit) => (
+                  <div className="habit-manager-item" key={habit.id}>
+                    <span
+                      className="today-dot"
+                      style={{ background: habit.color }}
+                    />
+                    <div className="habit-manager-name">
+                      <strong>{habit.name}</strong>
+                      <small>
+                        {CATEGORY_LABELS[habit.category]} · 目标{" "}
+                        {formatHabitTarget(habit)}
+                      </small>
+                    </div>
+                    <button
+                      className="manager-action"
+                      onClick={() => startEditHabit(habit)}
+                      title="编辑习惯"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      className="manager-action danger"
+                      onClick={() => handleDeleteHabit(habit)}
+                      title="删除习惯"
+                    >
+                      删除
+                    </button>
                   </div>
-                  <button
-                    className="manager-action"
-                    onClick={() => startEditHabit(habit)}
-                    title="编辑习惯"
-                  >
-                    编辑
-                  </button>
-                  <button
-                    className="manager-action danger"
-                    onClick={() => handleDeleteHabit(habit)}
-                    title="删除习惯"
-                  >
-                    删除
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </details>
+          </section>
+        </aside>
+      </div>
 
-            <div className="manager-form-title">
-              {editingHabitId ? "编辑习惯" : "新增习惯"}
+      {habitModalOpen && (
+        <div className="habit-modal-overlay" onClick={closeHabitModal}>
+          <div
+            className="habit-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="card-title">
+              <h2>{editingHabitId ? "编辑习惯" : "新增习惯"}</h2>
+              <button
+                className="habit-modal-close"
+                onClick={closeHabitModal}
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             <form className="quick-form" onSubmit={handleSaveHabit}>
               <input
@@ -836,28 +876,25 @@ export function Dashboard({ initialData }: DashboardProps) {
                   }))
                 }
               />
-              <button
-                className="primary-button form-submit"
-                type="submit"
-              >
-                {editingHabitId ? "保存" : "＋"}
-              </button>
+              <div className="habit-modal-actions">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={closeHabitModal}
+                >
+                  取消
+                </button>
+                <button className="primary-button" type="submit">
+                  {editingHabitId ? "确认保存" : "确认新增"}
+                </button>
+              </div>
             </form>
-            {editingHabitId && (
-              <button
-                className="ghost-button manager-cancel"
-                type="button"
-                onClick={resetHabitForm}
-              >
-                取消编辑
-              </button>
-            )}
-            <p className="hint" style={{ margin: "8px 0 0", fontSize: 12 }}>
+            <p className="hint" style={{ margin: "10px 0 0", fontSize: 12 }}>
               时间习惯填写目标时间，如 22:30；其他习惯填写数值目标，如 30。
             </p>
-          </section>
-        </aside>
-      </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

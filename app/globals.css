@@ -376,6 +376,103 @@ button {
   font-size: 12px;
 }
 
+.manager-add-button {
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.manager-add-button:hover {
+  filter: brightness(0.96);
+}
+
+.habit-manager-details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7f9fc;
+}
+
+.habit-manager-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.habit-manager-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-caret,
+.details-caret {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.habit-manager-details[open] .details-caret {
+  transform: rotate(180deg);
+}
+
+.habit-manager-details[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.habit-manager-details .habit-manager-list {
+  margin-bottom: 0;
+  padding: 8px;
+}
+
+.habit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 23 42 / 45%);
+}
+
+.habit-modal {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 20px 50px rgb(15 23 42 / 18%);
+}
+
+.habit-modal-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.habit-modal-close:hover {
+  color: var(--danger);
+  border-color: #fecaca;
+}
+
+.habit-modal-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .quick-form input,
 .quick-form select {
   min-width: 0;
