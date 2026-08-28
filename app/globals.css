@@ -125,7 +125,7 @@ button {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: 330px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -137,7 +137,19 @@ button {
   min-width: 0;
 }
 
+.side-stack {
+  grid-column: 1;
+  grid-row: 1;
+  order: -1;
+}
+
+.main-stack {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .card {
+  min-width: 0;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -390,7 +402,11 @@ input[type="time"].quick-number {
 }
 
 .matrix-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
@@ -399,6 +415,7 @@ input[type="time"].quick-number {
 .habits-grid {
   display: grid;
   grid-auto-rows: auto;
+  width: max-content;
   min-width: max-content;
 }
 
@@ -475,6 +492,19 @@ input[type="time"].quick-number {
   color: var(--primary);
 }
 
+.matrix-day.weekend {
+  background: #fff3e8;
+}
+
+.matrix-day.weekend strong,
+.matrix-day.weekend span {
+  color: #c76a1c;
+}
+
+.matrix-cell.weekend {
+  background: #fffaf5;
+}
+
 .habit-cell {
   position: sticky;
   left: 0;
@@ -517,6 +547,34 @@ input[type="time"].quick-number {
 
 .matrix-cell {
   padding: 3px;
+}
+
+.matrix-display {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.matrix-check {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: transparent;
+  border: 1px solid #d7dbe2;
+  background: #fff;
+  font-size: 15px;
+}
+
+.matrix-check.done {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
 }
 
 .cell-button {
@@ -612,6 +670,12 @@ input[type="time"].quick-number {
 @media (max-width: 1180px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .main-stack,
+  .side-stack {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .side-stack {

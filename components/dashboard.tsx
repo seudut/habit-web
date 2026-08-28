@@ -56,7 +56,7 @@ function parseHabitValue(habit: Habit, rawValue: string) {
 function getRecordDisplayValue(
   habit: Habit,
   record: RecordEntry | undefined,
-  draft: string | undefined,
+  draft?: string | undefined,
 ) {
   if (draft !== undefined) return draft;
   if (!record?.value) return "";
@@ -70,7 +70,6 @@ export function Dashboard({ initialData }: DashboardProps) {
   const [year, setYear] = useState(initialData.year);
   const [month, setMonth] = useState(initialData.month);
   const [loading, setLoading] = useState(false);
-  const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
 
   const recordMap = useMemo(() => {
@@ -174,31 +173,6 @@ export function Dashboard({ initialData }: DashboardProps) {
     }
   }
 
-  async function handleMatrixValue(
-    habit: Habit,
-    date: string,
-    rawValue: string,
-  ) {
-    const value = parseHabitValue(habit, rawValue);
-    if (value === null) return;
-
-    try {
-      await saveRecord(
-        habit.id,
-        date,
-        value > 0 && Number.isFinite(value),
-        Number.isFinite(value) ? value : 0,
-      );
-      setMatrixDrafts((current) => {
-        const next = { ...current };
-        delete next[getRecordKey(habit.id, date)];
-        return next;
-      });
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "保存失败");
-    }
-  }
-
   async function handleAddHabit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -276,20 +250,6 @@ export function Dashboard({ initialData }: DashboardProps) {
     await refresh(year, month);
   }
 
-  const weekGroups = useMemo(() => {
-    const groups: Array<{ start: number; end: number }> = [];
-    let start = 1;
-    for (let index = 1; index <= data.days.length; index += 1) {
-      const day = data.days[index - 1];
-      const isoWeekday = day.weekday === 0 ? 7 : day.weekday;
-      if (isoWeekday === 7 || index === data.days.length) {
-        groups.push({ start, end: index });
-        start = index + 1;
-      }
-    }
-    return groups;
-  }, [data.days]);
-
   const gridStyle: CSSProperties = {
     gridTemplateColumns: `216px repeat(${data.days.length}, ${
       data.habits.some((habit) => habit.unit === "time") ? 64 : 44
@@ -349,36 +309,25 @@ export function Dashboard({ initialData }: DashboardProps) {
             <div className="card-title">
               <h2>月度习惯矩阵</h2>
               <span className="hint">
-                时间习惯填写 HH:MM，时长习惯填写分钟数
+                数据只读，请在左侧“今日打卡”中修改
               </span>
             </div>
             {data.habits.length === 0 ? (
               <div className="empty-state">
-                还没有习惯，先在右侧添加一个吧。
+                还没有习惯，先在左侧添加一个吧。
               </div>
             ) : (
               <div className="matrix-shell">
                 <div className="habits-grid" style={gridStyle}>
                   <div className="matrix-corner">习惯 / 日期</div>
-                  {weekGroups.map((group, index) => (
-                    <div
-                      className="matrix-week"
-                      key={`week-${group.start}`}
-                      style={{
-                        gridColumn: `${group.start + 1} / span ${
-                          group.end - group.start + 1
-                        }`,
-                      }}
-                    >
-                      WEEK {index + 1}
-                    </div>
-                  ))}
-
-                  <div className="matrix-corner">日期</div>
                   {data.days.map((day) => (
                     <div
                       className={`matrix-day ${
-                        day.date === today ? "today" : ""
+                        day.date === today
+                          ? "today"
+                          : day.weekday === 0 || day.weekday === 6
+                            ? "weekend"
+                            : ""
                       }`}
                       key={day.date}
                       title={`${day.date} 周${day.label}`}
@@ -423,58 +372,42 @@ export function Dashboard({ initialData }: DashboardProps) {
                           const record = recordMap.get(
                             getRecordKey(habit.id, day.date),
                           );
+                          const isWeekend =
+                            day.weekday === 0 || day.weekday === 6;
                           if (habit.unit === "boolean") {
                             return (
-                              <button
-                                className={`matrix-cell cell-button ${
-                                  record?.completed ? "done" : ""
-                                } ${day.date > today ? "future" : ""}`}
+                              <div
+                                className={`matrix-cell ${
+                                  isWeekend ? "weekend" : ""
+                                }`}
                                 key={`${habit.id}-${day.date}`}
-                                onClick={() => handleToggle(habit, day.date)}
-                                disabled={day.date > today}
                                 title={`${day.date} ${record?.completed ? "已完成" : "未完成"}`}
                               >
-                                ✓
-                              </button>
+                                <span
+                                  className={`matrix-check ${
+                                  record?.completed ? "done" : ""
+                                  }`}
+                                >
+                                  ✓
+                                </span>
+                              </div>
                             );
                           }
 
                           const key = getRecordKey(habit.id, day.date);
-                          const draft = matrixDrafts[key];
                           const value = getRecordDisplayValue(
                             habit,
                             record,
-                            draft,
                           );
                           return (
-                            <div className="matrix-cell" key={key}>
-                              <input
-                                className={
-                                  habit.unit === "time"
-                                    ? "cell-time"
-                                    : "cell-number"
-                                }
-                                type={
-                                  habit.unit === "time" ? "time" : "number"
-                                }
-                                min={habit.unit === "time" ? undefined : "0"}
-                                value={value}
-                                placeholder="0"
-                                disabled={day.date > today}
-                                onChange={(event) =>
-                                  setMatrixDrafts((current) => ({
-                                    ...current,
-                                    [key]: event.target.value,
-                                  }))
-                                }
-                                onBlur={(event) =>
-                                  handleMatrixValue(
-                                    habit,
-                                    day.date,
-                                    event.target.value,
-                                  )
-                                }
-                              />
+                            <div
+                              className={`matrix-cell ${
+                                isWeekend ? "weekend" : ""
+                              }`}
+                              key={key}
+                              title={`${day.date} · ${value || "未记录"}`}
+                            >
+                              <span className="matrix-display">{value}</span>
                             </div>
                           );
                         }),
