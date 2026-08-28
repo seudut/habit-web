@@ -2,9 +2,43 @@
 
 import { useMemo } from "react";
 import type { EChartsOption } from "echarts";
-import { formatMinutesAsTime } from "@/lib/scoring";
 import type { HabitStat } from "@/lib/types";
 import { EChart } from "./echart";
+
+const MIN_DEVIATION = -1;
+const MAX_DEVIATION = 5;
+
+function clampDeviation(value: number) {
+  return Math.max(MIN_DEVIATION, Math.min(MAX_DEVIATION, value));
+}
+
+function getTimeDeviationMinutes(
+  name: string,
+  target: number,
+  value: number,
+) {
+  const isEarlyRise = name.includes("早起") || target < 12 * 60;
+
+  if (isEarlyRise) {
+    return value - target;
+  }
+
+  if (value < target && value <= 6 * 60) {
+    return 24 * 60 - target + value;
+  }
+
+  return value - target;
+}
+
+function getTimeDeviationHours(
+  name: string,
+  target: number,
+  value: number,
+) {
+  return clampDeviation(
+    getTimeDeviationMinutes(name, target, value) / 60,
+  );
+}
 
 export function SleepTimeChart({
   stats,
@@ -17,8 +51,11 @@ export function SleepTimeChart({
     () => ({
       tooltip: {
         trigger: "axis",
-        valueFormatter: (value) =>
-          typeof value === "number" ? formatMinutesAsTime(value) : String(value),
+        valueFormatter: (value) => {
+          if (typeof value !== "number") return String(value);
+          const sign = value > 0 ? "+" : "";
+          return `${sign}${value.toFixed(1)}h`;
+        },
       },
       legend: {
         type: "scroll",
@@ -26,7 +63,7 @@ export function SleepTimeChart({
         data: stats.map((stat) => stat.name),
         textStyle: { fontSize: 11, color: "#4b5563" },
       },
-      grid: { left: 58, right: 20, top: 42, bottom: 32 },
+      grid: { left: 44, right: 20, top: 42, bottom: 32 },
       xAxis: {
         type: "category",
         boundaryGap: false,
@@ -35,11 +72,13 @@ export function SleepTimeChart({
       },
       yAxis: {
         type: "value",
-        min: 0,
-        max: 1440,
-        interval: 360,
+        name: "偏离目标（小时）",
+        nameTextStyle: { color: "#6b7280", fontSize: 11 },
+        min: MIN_DEVIATION,
+        max: MAX_DEVIATION,
+        interval: 1,
         axisLabel: {
-          formatter: (value: number) => formatMinutesAsTime(value),
+          formatter: (value: number) => `${value}h`,
           color: "#4b5563",
         },
         splitLine: { lineStyle: { color: "#f0f1f3" } },
@@ -53,7 +92,15 @@ export function SleepTimeChart({
         emphasis: { focus: "series" },
         lineStyle: { width: 2, color: stat.color },
         itemStyle: { color: stat.color },
-        data: stat.values.map((value) => (value > 0 ? value : null)),
+        data: stat.values.map((value) => {
+          if (value <= 0) return null;
+          const deviation = getTimeDeviationHours(
+            stat.name,
+            stat.target,
+            value,
+          );
+          return Math.round(deviation * 10) / 10;
+        }),
         markLine:
           index === 0
             ? {
@@ -69,12 +116,9 @@ export function SleepTimeChart({
                   position: "insideEndTop",
                   fontSize: 10,
                   color: "#6b7280",
-                  formatter: (params) =>
-                    `目标 ${formatMinutesAsTime(Number(params.value))}`,
+                  formatter: "GOAL 0h",
                 },
-                data: stats.map((goalStat) => ({
-                  yAxis: goalStat.target,
-                })),
+                data: [{ yAxis: 0 }],
               }
             : undefined,
       })),

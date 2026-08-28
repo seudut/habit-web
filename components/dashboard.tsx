@@ -532,7 +532,7 @@ export function Dashboard({ initialData }: DashboardProps) {
                 <h2>单项完成情况（图表）（{group.label}）</h2>
                 <span className="hint">
                   {group.category === "sleep"
-                    ? "纵轴为实际时间点，虚线表示目标时间"
+                    ? "纵轴为偏离目标的时长（小时），虚线为目标 0"
                     : "每个习惯按日归一化到 0–100，点击图例可筛选"}
                 </span>
               </div>
