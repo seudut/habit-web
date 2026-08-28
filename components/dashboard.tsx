@@ -251,7 +251,7 @@ export function Dashboard({ initialData }: DashboardProps) {
   }
 
   const gridStyle: CSSProperties = {
-    gridTemplateColumns: `150px repeat(${data.days.length}, minmax(36px, 1fr))`,
+    gridTemplateColumns: `130px repeat(${data.days.length}, minmax(28px, 1fr))`,
   };
 
   const today = data.today;
@@ -307,12 +307,12 @@ export function Dashboard({ initialData }: DashboardProps) {
             <div className="card-title">
               <h2>月度习惯矩阵</h2>
               <span className="hint">
-                数据只读，请在左侧“今日打卡”中修改
+                数据只读，请在右侧“今日打卡”中修改
               </span>
             </div>
             {data.habits.length === 0 ? (
               <div className="empty-state">
-                还没有习惯，先在左侧添加一个吧。
+                还没有习惯，先在右侧添加一个吧。
               </div>
             ) : (
               <div className="matrix-shell">
