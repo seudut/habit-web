@@ -127,7 +127,7 @@ export function SleepTimeChart({
         ...stats.map((stat) => ({
           name: stat.name,
           type: "line" as const,
-          smooth: true,
+          smooth: false,
           symbol: "none",
           connectNulls: false,
           emphasis: { focus: "series" as const },
