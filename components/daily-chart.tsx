@@ -6,6 +6,7 @@ import type { DailyStat } from "@/lib/types";
 import { EChart } from "./echart";
 
 export function DailyChart({ stats }: { stats: DailyStat[] }) {
+  const dayCount = stats.length;
   const option = useMemo<EChartsOption>(
     () => ({
       tooltip: {
@@ -17,7 +18,30 @@ export function DailyChart({ stats }: { stats: DailyStat[] }) {
         type: "category",
         boundaryGap: false,
         data: stats.map((stat) => `${stat.day}日`),
-        axisLabel: { interval: 1 },
+        axisLine: {
+          show: true,
+          onZero: false,
+          lineStyle: { color: "#9ca3af", width: 1 },
+        },
+        axisTick: {
+          show: true,
+          inside: false,
+          length: 4,
+          alignWithLabel: true,
+          interval: 0,
+          lineStyle: { color: "#9ca3af", width: 1 },
+        },
+        axisLabel: {
+          interval: 0,
+          margin: 6,
+          fontSize: 10,
+          color: "#4b5563",
+          formatter: (value: string, index: number) => {
+            const day = value.replace(/日$/, "");
+            return index === dayCount - 1 ? `${day}日` : day;
+          },
+        },
+        splitLine: { show: false },
       },
       yAxis: {
         type: "value",
