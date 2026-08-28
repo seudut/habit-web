@@ -8,9 +8,11 @@ import { EChart } from "./echart";
 export function PracticeDurationChart({
   stats,
   height = 280,
+  max = 120,
 }: {
   stats: HabitStat[];
   height?: number;
+  max?: number;
 }) {
   const dayCount = stats[0]?.values.length ?? 0;
   const option = useMemo<EChartsOption>(
@@ -61,7 +63,7 @@ export function PracticeDurationChart({
         name: "时长（分钟）",
         nameTextStyle: { color: "#6b7280", fontSize: 11 },
         min: 0,
-        max: 120,
+        max,
         interval: 30,
         axisLabel: {
           color: "#4b5563",

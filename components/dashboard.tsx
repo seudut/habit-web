@@ -13,7 +13,6 @@ import {
   parseTimeToMinutes,
 } from "@/lib/scoring";
 import { DailyChart } from "./daily-chart";
-import { HabitChart } from "./habit-chart";
 import { PracticeDurationChart } from "./practice-duration-chart";
 import { SleepTimeChart } from "./sleep-time-chart";
 
@@ -536,7 +535,7 @@ export function Dashboard({ initialData }: DashboardProps) {
                     ? "纵轴为偏离目标的时长（小时），虚线为目标 0"
                     : group.category === "practice"
                       ? "纵轴为实际时长（分钟），范围 0–120"
-                      : "每个习惯按日归一化到 0–100，点击图例可筛选"}
+                      : "纵轴为实际时长（分钟），范围 0–60"}
                 </span>
               </div>
               {group.category === "sleep" ? (
@@ -544,7 +543,11 @@ export function Dashboard({ initialData }: DashboardProps) {
               ) : group.category === "practice" ? (
                 <PracticeDurationChart stats={group.stats} height={280} />
               ) : (
-                <HabitChart stats={group.stats} height={260} />
+                <PracticeDurationChart
+                  stats={group.stats}
+                  height={280}
+                  max={60}
+                />
               )}
             </section>
           ))}
