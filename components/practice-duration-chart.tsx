@@ -15,6 +15,7 @@ export function PracticeDurationChart({
   max?: number;
 }) {
   const dayCount = stats[0]?.values.length ?? 0;
+  const interval = max <= 60 ? 10 : 15;
   const option = useMemo<EChartsOption>(
     () => ({
       tooltip: {
@@ -64,7 +65,7 @@ export function PracticeDurationChart({
         nameTextStyle: { color: "#6b7280", fontSize: 11 },
         min: 0,
         max,
-        interval: 30,
+        interval,
         axisLabel: {
           color: "#4b5563",
           fontSize: 10,
@@ -94,7 +95,7 @@ export function PracticeDurationChart({
         data: stat.values.map((value) => (value > 0 ? value : null)),
       })),
     }),
-    [stats],
+    [stats, interval],
   );
 
   return <EChart option={option} height={height} />;
