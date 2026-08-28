@@ -71,22 +71,23 @@ export function SleepTimeChart({
         axisLine: {
           show: true,
           onZero: false,
-          lineStyle: { color: "#334155", width: 1.5 },
+          lineStyle: { color: "#9ca3af", width: 1 },
         },
         axisTick: {
           show: true,
           inside: false,
-          length: 8,
+          length: 4,
           alignWithLabel: true,
           interval: 0,
-          lineStyle: { color: "#334155", width: 1.5 },
+          lineStyle: { color: "#9ca3af", width: 1 },
         },
         splitLine: { show: false },
         axisLabel: {
           interval: 0,
-          margin: 8,
+          margin: 6,
           fontSize: 10,
           color: "#4b5563",
+          formatter: (value: string) => value.replace(/日$/, ""),
         },
       },
       yAxis: {
@@ -101,7 +102,10 @@ export function SleepTimeChart({
         },
         axisLine: { show: false },
         axisTick: { show: false },
-        splitLine: { show: false },
+        splitLine: {
+          show: true,
+          lineStyle: { color: "#f0f1f3" },
+        },
       },
       series: [
         {
