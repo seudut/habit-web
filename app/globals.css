@@ -661,14 +661,17 @@ input[type="time"].quick-number {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
+  min-width: 0;
   height: 34px;
   border: 0;
   background: transparent;
   text-align: center;
-  font-size: 11px;
+  font-size: clamp(7px, 0.5vw, 9px);
   font-variant-numeric: tabular-nums;
   color: #374151;
-  padding: 0 2px;
+  padding: 0;
+  letter-spacing: -0.03em;
+  cursor: text;
 }
 
 .cell-time::-webkit-calendar-picker-indicator,

@@ -71,6 +71,7 @@ export function Dashboard({ initialData }: DashboardProps) {
   const [year, setYear] = useState(initialData.year);
   const [month, setMonth] = useState(initialData.month);
   const [loading, setLoading] = useState(false);
+  const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
 
   const recordMap = useMemo(() => {
@@ -179,6 +180,26 @@ export function Dashboard({ initialData }: DashboardProps) {
         completed,
         habit.unit === "boolean" ? (completed ? 1 : 0) : record?.value ?? 0,
       );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "保存失败");
+    }
+  }
+
+  async function handleMatrixValue(
+    habit: Habit,
+    date: string,
+    rawValue: string,
+  ) {
+    const value = parseHabitValue(habit, rawValue);
+    if (value === null) return;
+
+    try {
+      await saveRecord(habit.id, date, value > 0, value);
+      setMatrixDrafts((current) => {
+        const next = { ...current };
+        delete next[getRecordKey(habit.id, date)];
+        return next;
+      });
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "保存失败");
     }
@@ -319,7 +340,7 @@ export function Dashboard({ initialData }: DashboardProps) {
             <div className="card-title">
               <h2>月度习惯矩阵</h2>
               <span className="hint">
-                数据只读，请在右侧“今日打卡”中修改
+                早睡、早起可在矩阵中直接编辑；其余分项请在右侧打卡
               </span>
             </div>
             {data.habits.length === 0 ? (
@@ -433,6 +454,49 @@ export function Dashboard({ initialData }: DashboardProps) {
                           }
 
                           const key = getRecordKey(habit.id, day.date);
+                          const draft = matrixDrafts[key];
+                          if (habit.unit === "time") {
+                            const value = getRecordDisplayValue(
+                              habit,
+                              record,
+                              draft,
+                            );
+                            return (
+                              <div
+                                className={`matrix-cell ${
+                                  isWeekend ? "weekend" : ""
+                                }`}
+                                key={key}
+                                style={{
+                                  gridColumn: 4 + dayIndex,
+                                  gridRow: row,
+                                }}
+                                title={`${day.date} · ${value || "未记录"}`}
+                              >
+                                <input
+                                  className="cell-time"
+                                  type="time"
+                                  value={value}
+                                  min="00:00"
+                                  max="23:59"
+                                  onChange={(event) =>
+                                    setMatrixDrafts((current) => ({
+                                      ...current,
+                                      [key]: event.target.value,
+                                    }))
+                                  }
+                                  onBlur={(event) =>
+                                    handleMatrixValue(
+                                      habit,
+                                      day.date,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
                           const value = getRecordDisplayValue(
                             habit,
                             record,
