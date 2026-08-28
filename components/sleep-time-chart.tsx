@@ -47,6 +47,7 @@ export function SleepTimeChart({
   stats: HabitStat[];
   height?: number;
 }) {
+  const dayCount = stats[0]?.values.length ?? 0;
   const option = useMemo<EChartsOption>(
     () => ({
       tooltip: {
@@ -87,7 +88,10 @@ export function SleepTimeChart({
           margin: 6,
           fontSize: 10,
           color: "#4b5563",
-          formatter: (value: string) => value.replace(/日$/, ""),
+          formatter: (value: string, index: number) => {
+            const day = value.replace(/日$/, "");
+            return index === dayCount - 1 ? `${day}日` : day;
+          },
         },
       },
       yAxis: {
