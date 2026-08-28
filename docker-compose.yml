@@ -1,0 +1,13 @@
+services:
+  habit-web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_PATH=/app/data/habits.db
+    volumes:
+      - habit-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  habit-data:

@@ -1,0 +1,605 @@
+"use client";
+
+import type { CSSProperties, FormEvent } from "react";
+import { useMemo, useState } from "react";
+import type {
+  Habit,
+  HabitUnit,
+  MonthData,
+  RecordEntry,
+} from "@/lib/types";
+import { DailyChart } from "./daily-chart";
+import { HabitChart } from "./habit-chart";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  sleep: "睡眠",
+  exercise: "运动",
+  reading: "阅读",
+  work: "工作",
+  diet: "饮食",
+  other: "其他",
+};
+
+interface DashboardProps {
+  initialData: MonthData;
+}
+
+function getRecordKey(habitId: string, date: string) {
+  return `${habitId}:${date}`;
+}
+
+function getToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function Dashboard({ initialData }: DashboardProps) {
+  const [data, setData] = useState(initialData);
+  const [year, setYear] = useState(initialData.year);
+  const [month, setMonth] = useState(initialData.month);
+  const [loading, setLoading] = useState(false);
+  const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
+  const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
+
+  const recordMap = useMemo(() => {
+    const map = new Map<string, RecordEntry>();
+    for (const record of data.records) {
+      map.set(getRecordKey(record.habitId, record.date), record);
+    }
+    return map;
+  }, [data.records]);
+
+  async function refresh(currentYear: number, currentMonth: number) {
+    const response = await fetch(
+      `/api/month?year=${currentYear}&month=${currentMonth}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      throw new Error("刷新数据失败");
+    }
+    setData(await response.json());
+  }
+
+  async function navigate(delta: number) {
+    let nextYear = year;
+    let nextMonth = month + delta;
+    if (nextMonth < 1) {
+      nextMonth = 12;
+      nextYear -= 1;
+    }
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+
+    setLoading(true);
+    setYear(nextYear);
+    setMonth(nextMonth);
+    try {
+      await refresh(nextYear, nextMonth);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function goToday() {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    setLoading(true);
+    setYear(currentYear);
+    setMonth(currentMonth);
+    try {
+      await refresh(currentYear, currentMonth);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveRecord(
+    habitId: string,
+    date: string,
+    completed: boolean,
+    value: number,
+  ) {
+    const response = await fetch("/api/records", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ habitId, date, completed, value }),
+    });
+    if (!response.ok) {
+      throw new Error("保存记录失败");
+    }
+    await refresh(year, month);
+  }
+
+  async function handleToggle(habit: Habit, date: string) {
+    const record = recordMap.get(getRecordKey(habit.id, date));
+    const completed = !Boolean(record?.completed);
+    try {
+      await saveRecord(
+        habit.id,
+        date,
+        completed,
+        habit.unit === "boolean" ? (completed ? 1 : 0) : record?.value ?? 0,
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "保存失败");
+    }
+  }
+
+  async function handleMatrixNumber(
+    habit: Habit,
+    date: string,
+    rawValue: string,
+  ) {
+    const value = Number(rawValue);
+    try {
+      await saveRecord(
+        habit.id,
+        date,
+        value > 0 && Number.isFinite(value),
+        Number.isFinite(value) ? value : 0,
+      );
+      setMatrixDrafts((current) => {
+        const next = { ...current };
+        delete next[getRecordKey(habit.id, date)];
+        return next;
+      });
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "保存失败");
+    }
+  }
+
+  async function handleAddHabit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const unit = String(formData.get("unit")) as HabitUnit;
+    const target = Number(formData.get("target"));
+
+    const response = await fetch("/api/habits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: String(formData.get("name") ?? ""),
+        category: String(formData.get("category") ?? "other"),
+        unit,
+        target: unit === "boolean" ? 1 : target,
+        color: String(formData.get("color") ?? "#3b82f6"),
+      }),
+    });
+
+    if (!response.ok) {
+      window.alert("添加习惯失败");
+      return;
+    }
+
+    form.reset();
+    await refresh(year, month);
+  }
+
+  async function handleDeleteHabit(habit: Habit) {
+    if (!window.confirm(`确定删除“${habit.name}”吗？历史记录会一并删除。`)) {
+      return;
+    }
+    const response = await fetch(`/api/habits/${habit.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      window.alert("删除失败");
+      return;
+    }
+    await refresh(year, month);
+  }
+
+  async function handleClearMonth() {
+    if (
+      !window.confirm(
+        `确定清空 ${year} 年 ${month} 月的所有记录吗？此操作不可撤销。`,
+      )
+    ) {
+      return;
+    }
+    const monthKey = `${year}-${String(month).padStart(2, "0")}`;
+    const response = await fetch(
+      `/api/records?month=${monthKey}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) {
+      window.alert("清空失败");
+      return;
+    }
+    await refresh(year, month);
+  }
+
+  const weekGroups = useMemo(() => {
+    const groups: Array<{ start: number; end: number }> = [];
+    let start = 1;
+    for (let index = 1; index <= data.days.length; index += 1) {
+      const day = data.days[index - 1];
+      const isoWeekday = day.weekday === 0 ? 7 : day.weekday;
+      if (isoWeekday === 7 || index === data.days.length) {
+        groups.push({ start, end: index });
+        start = index + 1;
+      }
+    }
+    return groups;
+  }, [data.days]);
+
+  const gridStyle: CSSProperties = {
+    gridTemplateColumns: `216px repeat(${data.days.length}, 44px)`,
+  };
+
+  const today = data.today;
+  const isCurrentMonth = today.startsWith(
+    `${year}-${String(month).padStart(2, "0")}`,
+  );
+
+  return (
+    <>
+      <header className="app-header">
+        <div className="app-title">
+          <h1>习惯打卡</h1>
+          <p>按月记录每日作息，自动汇总完成情况</p>
+        </div>
+        <div className="month-nav">
+          <button
+            className="icon-button"
+            onClick={() => navigate(-1)}
+            aria-label="上一个月"
+          >
+            ‹
+          </button>
+          <div className="month-title">
+            {year} 年 {month} 月
+          </div>
+          <button
+            className="icon-button"
+            onClick={() => navigate(1)}
+            aria-label="下一个月"
+          >
+            ›
+          </button>
+          <button className="ghost-button" onClick={goToday}>
+            回到今天
+          </button>
+          <button className="danger-button" onClick={handleClearMonth}>
+            清空本月
+          </button>
+        </div>
+      </header>
+
+      <div className={`dashboard-grid ${loading ? "loading-overlay" : ""}`}>
+        <div className="main-stack">
+          <section className="card">
+            <div className="card-title">
+              <h2>每日总体完成率</h2>
+              <span className="hint">已打卡项 ÷ 当日计划项</span>
+            </div>
+            <DailyChart stats={data.dailyStats} />
+          </section>
+
+          <section className="card">
+            <div className="card-title">
+              <h2>月度习惯矩阵</h2>
+              <span className="hint">
+                点击勾选；数字习惯在格子里输入实际值
+              </span>
+            </div>
+            {data.habits.length === 0 ? (
+              <div className="empty-state">
+                还没有习惯，先在右侧添加一个吧。
+              </div>
+            ) : (
+              <div className="matrix-shell">
+                <div className="habits-grid" style={gridStyle}>
+                  <div className="matrix-corner">习惯 / 日期</div>
+                  {weekGroups.map((group, index) => (
+                    <div
+                      className="matrix-week"
+                      key={`week-${group.start}`}
+                      style={{
+                        gridColumn: `${group.start + 1} / span ${
+                          group.end - group.start + 1
+                        }`,
+                      }}
+                    >
+                      WEEK {index + 1}
+                    </div>
+                  ))}
+
+                  <div className="matrix-corner">日期</div>
+                  {data.days.map((day) => (
+                    <div
+                      className={`matrix-day ${
+                        day.date === today ? "today" : ""
+                      }`}
+                      key={day.date}
+                      title={`${day.date} 周${day.label}`}
+                    >
+                      <strong>{day.day}</strong>
+                      <span>{day.label}</span>
+                    </div>
+                  ))}
+
+                  {data.habits.map((habit) => {
+                    const recordKey = `blank-${habit.id}`;
+                    void recordKey;
+                    return [
+                      <div className="habit-cell" key={`habit-${habit.id}`}>
+                        <span
+                          className="habit-dot"
+                          style={{ background: habit.color }}
+                        />
+                        <span className="habit-name" title={habit.name}>
+                          {habit.name}
+                        </span>
+                        <button
+                          className="habit-delete"
+                          onClick={() => handleDeleteHabit(habit)}
+                          title="删除习惯"
+                        >
+                          ×
+                        </button>
+                      </div>,
+                      ...data.days.map((day) => {
+                        const record = recordMap.get(
+                          getRecordKey(habit.id, day.date),
+                        );
+                        if (habit.unit === "boolean") {
+                          return (
+                            <button
+                              className={`matrix-cell cell-button ${
+                                record?.completed ? "done" : ""
+                              } ${day.date > today ? "future" : ""}`}
+                              key={`${habit.id}-${day.date}`}
+                              onClick={() => handleToggle(habit, day.date)}
+                              disabled={day.date > today}
+                              title={`${day.date} ${record?.completed ? "已完成" : "未完成"}`}
+                            >
+                              ✓
+                            </button>
+                          );
+                        }
+
+                        const key = getRecordKey(habit.id, day.date);
+                        const draft = matrixDrafts[key];
+                        const value =
+                          draft ??
+                          (record?.value ? String(record.value) : "");
+                        return (
+                          <div className="matrix-cell" key={key}>
+                            <input
+                              className={`cell-number ${
+                                record?.completed ? "done" : ""
+                              }`}
+                              type="number"
+                              min="0"
+                              value={value}
+                              placeholder="0"
+                              disabled={day.date > today}
+                              onChange={(event) =>
+                                setMatrixDrafts((current) => ({
+                                  ...current,
+                                  [key]: event.target.value,
+                                }))
+                              }
+                              onBlur={(event) =>
+                                handleMatrixNumber(
+                                  habit,
+                                  day.date,
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </div>
+                        );
+                      }),
+                    ];
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="card">
+            <div className="card-title">
+              <h2>分项完成统计</h2>
+              <span className="hint">本月每个习惯的达标天数</span>
+            </div>
+            <HabitChart stats={data.habitStats} />
+          </section>
+        </div>
+
+        <aside className="side-stack">
+          <section className="card">
+            <div className="card-title">
+              <h2>月度总览</h2>
+              <span className="hint">综合完成情况</span>
+            </div>
+            <div className="overview">
+              <div
+                className="ring"
+                style={{ "--rate": data.overall.rate } as CSSProperties}
+              >
+                <div className="ring-inner">
+                  <div className="ring-value">{data.overall.rate}%</div>
+                  <div className="ring-label">综合完成率</div>
+                </div>
+              </div>
+              <div className="overview-detail">
+                <div className="overview-row">
+                  <span>已打卡</span>
+                  <strong>
+                    {data.overall.completed} / {data.overall.target}
+                  </strong>
+                </div>
+                <div className="overview-row">
+                  <span>连续达标</span>
+                  <strong>{data.overall.streak} 天</strong>
+                </div>
+                <div className="overview-row">
+                  <span>完整达标日</span>
+                  <strong>{data.overall.perfectDays} 天</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="card-title">
+              <h2>今日打卡</h2>
+              {!isCurrentMonth && (
+                <button className="ghost-button" onClick={goToday}>
+                  回本月
+                </button>
+              )}
+            </div>
+            {isCurrentMonth ? (
+              <div className="today-list">
+                {data.habits.map((habit) => {
+                  const record = recordMap.get(
+                    getRecordKey(habit.id, today),
+                  );
+                  if (habit.unit === "boolean") {
+                    return (
+                      <div className="today-item" key={habit.id}>
+                        <span
+                          className="today-dot"
+                          style={{ background: habit.color }}
+                        />
+                        <span className="today-name">{habit.name}</span>
+                        <button
+                          className={`check-button ${
+                            record?.completed ? "done" : ""
+                          }`}
+                          onClick={() => handleToggle(habit, today)}
+                          aria-label="切换今日完成状态"
+                        >
+                          ✓
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  const key = getRecordKey(habit.id, today);
+                  const draft = quickDrafts[key];
+                  const value =
+                    draft ?? (record?.value ? String(record.value) : "");
+                  return (
+                    <div className="today-item" key={habit.id}>
+                      <span
+                        className="today-dot"
+                        style={{ background: habit.color }}
+                      />
+                      <span className="today-name">
+                        <span>{habit.name}</span>
+                        <div className="today-target">
+                          目标 {habit.target}
+                          {habit.unit === "minutes" ? " 分钟" : " 次"}
+                        </div>
+                      </span>
+                      <input
+                        className="quick-number"
+                        type="number"
+                        min="0"
+                        value={value}
+                        placeholder="0"
+                        onChange={(event) =>
+                          setQuickDrafts((current) => ({
+                            ...current,
+                            [key]: event.target.value,
+                          }))
+                        }
+                        onBlur={async (event) => {
+                          const numeric = Number(event.target.value);
+                          await saveRecord(
+                            habit.id,
+                            today,
+                            numeric > 0 && Number.isFinite(numeric),
+                            Number.isFinite(numeric) ? numeric : 0,
+                          );
+                          setQuickDrafts((current) => {
+                            const next = { ...current };
+                            delete next[key];
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                当前浏览的不是本月，切换回今天即可打卡。
+              </div>
+            )}
+          </section>
+
+          <section className="card">
+            <h2 className="card-title">添加习惯</h2>
+            <form className="quick-form" onSubmit={handleAddHabit}>
+              <input
+                className="form-name"
+                name="name"
+                placeholder="习惯名称"
+                required
+              />
+              <select
+                className="form-category"
+                name="category"
+                defaultValue="other"
+              >
+                {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="form-unit"
+                name="unit"
+                defaultValue="boolean"
+              >
+                <option value="boolean">勾选</option>
+                <option value="minutes">分钟</option>
+                <option value="times">次数</option>
+              </select>
+              <input
+                className="form-target"
+                name="target"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="每日目标"
+              />
+              <input
+                type="color"
+                className="color-input form-color"
+                name="color"
+              />
+              <button
+                className="primary-button form-submit"
+                type="submit"
+              >
+                ＋
+              </button>
+            </form>
+            <p className="hint" style={{ margin: "8px 0 0", fontSize: 12 }}>
+              数字习惯需要填写每日目标：如 30 分钟、5 次。
+            </p>
+          </section>
+        </aside>
+      </div>
+    </>
+  );
+}
