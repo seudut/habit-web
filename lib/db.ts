@@ -97,7 +97,7 @@ function seedDefaultHabits(db: Database.Database) {
       category: "sleep",
       target: 22 * 60 + 30,
       unit: "time",
-      color: "#4e79a7",
+      color: "#f28e2b",
     },
     {
       name: "早起",
@@ -111,7 +111,7 @@ function seedDefaultHabits(db: Database.Database) {
       category: "practice",
       target: 30,
       unit: "minutes",
-      color: "#f28e2b",
+      color: "#4e79a7",
     },
     {
       name: "打坐",
@@ -177,6 +177,13 @@ function seedDefaultHabits(db: Database.Database) {
   });
 
   transaction();
+
+  db.prepare(
+    "UPDATE habits SET color = ? WHERE name = ? AND category = ? AND color = ?",
+  ).run("#f28e2b", "早睡", "sleep", "#4e79a7");
+  db.prepare(
+    "UPDATE habits SET color = ? WHERE name = ? AND category = ? AND color = ?",
+  ).run("#4e79a7", "站桩", "practice", "#f28e2b");
 }
 
 function seedDemoRecords(db: Database.Database) {
