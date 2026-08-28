@@ -293,6 +293,87 @@ button {
 
 .form-submit {
   grid-area: button;
+  padding: 8px 4px;
+  font-size: 12px;
+}
+
+.habit-manager-list {
+  display: grid;
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.habit-manager-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7f9fc;
+}
+
+.habit-manager-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.habit-manager-name strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.habit-manager-name small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manager-action {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.manager-action:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.manager-action.danger {
+  color: var(--danger);
+  border-color: #fecaca;
+}
+
+.manager-action.danger:hover {
+  background: #fff2f2;
+  border-color: var(--danger);
+}
+
+.manager-form-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.manager-cancel {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .quick-form input,

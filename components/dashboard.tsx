@@ -24,6 +24,14 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ["sleep", "practice", "reading"];
 
+type HabitFormState = {
+  name: string;
+  category: string;
+  unit: HabitUnit;
+  target: string;
+  color: string;
+};
+
 interface DashboardProps {
   initialData: MonthData;
 }
@@ -66,6 +74,16 @@ function getRecordDisplayValue(
     : String(record.value);
 }
 
+function getHabitFormTarget(habit: Habit) {
+  if (habit.unit === "time") {
+    return formatMinutesAsTime(habit.target);
+  }
+  if (habit.unit === "boolean") {
+    return "";
+  }
+  return String(habit.target);
+}
+
 export function Dashboard({ initialData }: DashboardProps) {
   const [data, setData] = useState(initialData);
   const [year, setYear] = useState(initialData.year);
@@ -73,6 +91,14 @@ export function Dashboard({ initialData }: DashboardProps) {
   const [loading, setLoading] = useState(false);
   const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
+  const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
+  const [habitForm, setHabitForm] = useState<HabitFormState>({
+    name: "",
+    category: "sleep",
+    unit: "minutes",
+    target: "",
+    color: "#3b82f6",
+  });
 
   const recordMap = useMemo(() => {
     const map = new Map<string, RecordEntry>();
@@ -207,12 +233,32 @@ export function Dashboard({ initialData }: DashboardProps) {
     }
   }
 
-  async function handleAddHabit(event: FormEvent<HTMLFormElement>) {
+  function resetHabitForm() {
+    setEditingHabitId(null);
+    setHabitForm({
+      name: "",
+      category: "sleep",
+      unit: "minutes",
+      target: "",
+      color: "#3b82f6",
+    });
+  }
+
+  function startEditHabit(habit: Habit) {
+    setEditingHabitId(habit.id);
+    setHabitForm({
+      name: habit.name,
+      category: habit.category,
+      unit: habit.unit,
+      target: getHabitFormTarget(habit),
+      color: habit.color,
+    });
+  }
+
+  async function handleSaveHabit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const unit = String(formData.get("unit")) as HabitUnit;
-    const targetRaw = String(formData.get("target") ?? "").trim();
+    const unit = habitForm.unit;
+    const targetRaw = habitForm.target.trim();
     const target =
       unit === "time"
         ? parseTimeToMinutes(targetRaw)
@@ -229,24 +275,27 @@ export function Dashboard({ initialData }: DashboardProps) {
       return;
     }
 
-    const response = await fetch("/api/habits", {
-      method: "POST",
+    const response = await fetch(
+      editingHabitId ? `/api/habits/${editingHabitId}` : "/api/habits",
+      {
+      method: editingHabitId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: String(formData.get("name") ?? ""),
-        category: String(formData.get("category") ?? "other"),
+        name: habitForm.name,
+        category: habitForm.category,
         unit,
         target,
-        color: String(formData.get("color") ?? "#3b82f6"),
+        color: habitForm.color,
       }),
-    });
+      },
+    );
 
     if (!response.ok) {
-      window.alert("添加习惯失败");
+      window.alert(editingHabitId ? "保存习惯失败" : "添加习惯失败");
       return;
     }
 
-    form.reset();
+    resetHabitForm();
     await refresh(year, month);
   }
 
@@ -260,6 +309,9 @@ export function Dashboard({ initialData }: DashboardProps) {
     if (!response.ok) {
       window.alert("删除失败");
       return;
+    }
+    if (editingHabitId === habit.id) {
+      resetHabitForm();
     }
     await refresh(year, month);
   }
@@ -410,13 +462,6 @@ export function Dashboard({ initialData }: DashboardProps) {
                           >
                             {habit.name}
                           </span>
-                          <button
-                            className="habit-delete"
-                            onClick={() => handleDeleteHabit(habit)}
-                            title="删除习惯"
-                          >
-                            ×
-                          </button>
                         </div>,
                         <div
                           className="matrix-goal"
@@ -683,18 +728,68 @@ export function Dashboard({ initialData }: DashboardProps) {
           </section>
 
           <section className="card">
-            <h2 className="card-title">添加习惯</h2>
-            <form className="quick-form" onSubmit={handleAddHabit}>
+            <div className="card-title">
+              <h2>管理习惯</h2>
+              <span className="hint">新增、编辑或删除</span>
+            </div>
+
+            <div className="habit-manager-list">
+              {data.habits.map((habit) => (
+                <div className="habit-manager-item" key={habit.id}>
+                  <span
+                    className="today-dot"
+                    style={{ background: habit.color }}
+                  />
+                  <div className="habit-manager-name">
+                    <strong>{habit.name}</strong>
+                    <small>
+                      {CATEGORY_LABELS[habit.category]} · 目标{" "}
+                      {formatHabitTarget(habit)}
+                    </small>
+                  </div>
+                  <button
+                    className="manager-action"
+                    onClick={() => startEditHabit(habit)}
+                    title="编辑习惯"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className="manager-action danger"
+                    onClick={() => handleDeleteHabit(habit)}
+                    title="删除习惯"
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="manager-form-title">
+              {editingHabitId ? "编辑习惯" : "新增习惯"}
+            </div>
+            <form className="quick-form" onSubmit={handleSaveHabit}>
               <input
                 className="form-name"
-                name="name"
                 placeholder="习惯名称"
+                value={habitForm.name}
+                onChange={(event) =>
+                  setHabitForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
                 required
               />
               <select
                 className="form-category"
-                name="category"
-                defaultValue="sleep"
+                value={habitForm.category}
+                onChange={(event) =>
+                  setHabitForm((current) => ({
+                    ...current,
+                    category: event.target.value,
+                  }))
+                }
               >
                 {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -704,8 +799,13 @@ export function Dashboard({ initialData }: DashboardProps) {
               </select>
               <select
                 className="form-unit"
-                name="unit"
-                defaultValue="minutes"
+                value={habitForm.unit}
+                onChange={(event) =>
+                  setHabitForm((current) => ({
+                    ...current,
+                    unit: event.target.value as HabitUnit,
+                  }))
+                }
               >
                 <option value="boolean">勾选</option>
                 <option value="minutes">分钟</option>
@@ -714,23 +814,44 @@ export function Dashboard({ initialData }: DashboardProps) {
               </select>
               <input
                 className="form-target"
-                name="target"
                 type="text"
                 inputMode="decimal"
                 placeholder="目标：30 / 22:30"
+                value={habitForm.target}
+                onChange={(event) =>
+                  setHabitForm((current) => ({
+                    ...current,
+                    target: event.target.value,
+                  }))
+                }
               />
               <input
                 type="color"
                 className="color-input form-color"
-                name="color"
+                value={habitForm.color}
+                onChange={(event) =>
+                  setHabitForm((current) => ({
+                    ...current,
+                    color: event.target.value,
+                  }))
+                }
               />
               <button
                 className="primary-button form-submit"
                 type="submit"
               >
-                ＋
+                {editingHabitId ? "保存" : "＋"}
               </button>
             </form>
+            {editingHabitId && (
+              <button
+                className="ghost-button manager-cancel"
+                type="button"
+                onClick={resetHabitForm}
+              >
+                取消编辑
+              </button>
+            )}
             <p className="hint" style={{ margin: "8px 0 0", fontSize: 12 }}>
               时间习惯填写目标时间，如 22:30；其他习惯填写数值目标，如 30。
             </p>
