@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { isApiRequestAuthenticated } from "@/lib/auth";
 import { createHabit } from "@/lib/db";
 import type { HabitUnit } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const body = (await request.json()) as {
     name?: string;
     category?: string;

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { isApiRequestAuthenticated } from "@/lib/auth";
 import { getMonthData } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const year = Number(searchParams.get("year"));
   const month = Number(searchParams.get("month"));

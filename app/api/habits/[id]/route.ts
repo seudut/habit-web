@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isApiRequestAuthenticated } from "@/lib/auth";
 import { deleteHabit, updateHabit } from "@/lib/db";
 import type { HabitUnit } from "@/lib/types";
 
@@ -9,6 +10,10 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const { id } = await context.params;
   const body = (await request.json()) as {
     name?: string;
@@ -32,7 +37,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   return NextResponse.json(habit);
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const { id } = await context.params;
   deleteHabit(id);
   return NextResponse.json({ ok: true });

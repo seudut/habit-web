@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { isApiRequestAuthenticated } from "@/lib/auth";
 import { deleteRecordsForMonth, upsertRecord } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function PUT(request: Request) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const body = (await request.json()) as {
     habitId?: string;
     date?: string;
@@ -32,6 +37,10 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isApiRequestAuthenticated(request)) {
+    return NextResponse.json({ error: "未登录" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month");
 

@@ -42,6 +42,36 @@ npm start
 
 首次启动会自动创建示例习惯并生成当前月份演示数据。页面可以直接修改，也可以点击右上角“清空本月”。
 
+## 登录
+
+页面和数据 API 都需要登录后才能访问。未登录访问首页会跳转到 `/login`，直接调用数据 API 会返回 `401`。
+
+本地开发使用的账号密码和会话密钥放在 `.env.local`：
+
+```text
+HABIT_ADMIN_USERNAME=admin
+HABIT_ADMIN_PASSWORD=...
+HABIT_SESSION_SECRET=...
+COOKIE_SECURE=false
+```
+
+`.env.local` 已加入 `.gitignore`，不会提交到 Git。登录成功后会设置 HttpOnly Cookie，登录态有效期 30 天。
+
+Docker/VPS 部署前需要准备 `.env`，可以参考 `.env.example`：
+
+```bash
+cp .env.example .env
+```
+
+并至少修改：
+
+```text
+HABIT_ADMIN_PASSWORD
+HABIT_SESSION_SECRET
+```
+
+如果以后启用 HTTPS，将 `COOKIE_SECURE` 改为 `true`。
+
 开发模式：
 
 ```bash

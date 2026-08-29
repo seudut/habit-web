@@ -5,6 +5,10 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_PATH=/app/data/habits.db
+      - HABIT_ADMIN_USERNAME=${HABIT_ADMIN_USERNAME:-admin}
+      - HABIT_ADMIN_PASSWORD=${HABIT_ADMIN_PASSWORD:-change-me}
+      - HABIT_SESSION_SECRET=${HABIT_SESSION_SECRET:-change-me}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
     volumes:
       - habit-data:/app/data
     restart: unless-stopped

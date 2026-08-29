@@ -1,4 +1,7 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
+import { isSessionValid, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { getMonthData } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +16,11 @@ export default async function Home({
 }: {
   searchParams: SearchParams;
 }) {
+  const cookieStore = await cookies();
+  if (!isSessionValid(cookieStore.get(SESSION_COOKIE_NAME)?.value)) {
+    redirect("/login");
+  }
+
   const params = await searchParams;
   const now = new Date();
   const year = Number(

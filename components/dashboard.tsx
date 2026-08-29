@@ -349,6 +349,11 @@ export function Dashboard({ initialData }: DashboardProps) {
     await refresh(year, month);
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  }
+
   const gridStyle: CSSProperties = {
     gridTemplateColumns: `72px 102px 94px repeat(${data.days.length}, minmax(24px, 1fr))`,
   };
@@ -389,6 +394,9 @@ export function Dashboard({ initialData }: DashboardProps) {
           </button>
           <button className="danger-button" onClick={handleClearMonth}>
             清空本月
+          </button>
+          <button className="ghost-button" onClick={handleLogout}>
+            退出登录
           </button>
         </div>
       </header>
