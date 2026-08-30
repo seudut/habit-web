@@ -74,6 +74,27 @@ function createDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS weekly_tasks (
+      id TEXT PRIMARY KEY,
+      week_start TEXT NOT NULL,
+      date TEXT NOT NULL,
+      title TEXT NOT NULL,
+      actual_time TEXT NOT NULL DEFAULT '',
+      completed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_diaries (
+      week_start TEXT NOT NULL,
+      date TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (week_start, date)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_tasks_date
+      ON weekly_tasks (week_start, date);
   `);
 
   migrateSchema(db);

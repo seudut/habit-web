@@ -14,6 +14,7 @@
 - 每日总体得分面积图
 - 睡觉、实修、阅读三张独立图表
 - 今日快捷打卡
+- Weekly Plan 周计划页面：周历、任务、实际时间、完成状态和每日日记
 - 月度总览、达标项、连续达标天数
 - 周末日期使用独立颜色区分
 - SQLite 本地持久化
@@ -166,6 +167,27 @@ updated_at  更新时间
 ### meta
 
 存储数据库迁移版本、演示数据标记等系统信息。
+
+### weekly_tasks
+
+```text
+id           任务 ID
+week_start   周一日期 YYYY-MM-DD
+date         任务所属日期
+title        任务名称
+actual_time  实际完成时间
+completed    0 / 1
+created_at   创建时间
+```
+
+### weekly_diaries
+
+```text
+week_start   周一日期 YYYY-MM-DD
+date         日记日期
+content      日记内容
+updated_at   更新时间
+```
 
 ## 总体得分算法
 
@@ -338,6 +360,21 @@ PATCH  /api/habits/:id
 
 DELETE /api/habits/:id
        删除习惯
+
+GET    /api/weekly?weekStart=2026-08-24
+       获取一周计划、任务、日记和完成状态
+
+POST   /api/weekly/tasks
+       新增周任务
+
+PATCH  /api/weekly/tasks/:id
+       更新任务、实际时间或完成状态
+
+DELETE /api/weekly/tasks/:id
+       删除任务
+
+PUT    /api/weekly/diary
+       保存某天日记
 ```
 
 ## 目录结构

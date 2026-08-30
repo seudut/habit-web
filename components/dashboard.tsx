@@ -15,6 +15,7 @@ import {
 import { DailyChart } from "./daily-chart";
 import { PracticeDurationChart } from "./practice-duration-chart";
 import { SleepTimeChart } from "./sleep-time-chart";
+import { AppTabs } from "./app-tabs";
 
 const CATEGORY_LABELS: Record<string, string> = {
   sleep: "睡觉",
@@ -369,6 +370,7 @@ export function Dashboard({ initialData }: DashboardProps) {
 
   return (
     <>
+      <AppTabs active="month" />
       <header className="app-header">
         <div className="app-title">
           <h1>习惯打卡</h1>

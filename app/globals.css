@@ -50,6 +50,33 @@ button {
   flex-wrap: wrap;
 }
 
+.app-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.app-tab {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.app-tab:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.app-tab.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
 .app-title h1 {
   margin: 0;
   font-size: 26px;
@@ -1025,6 +1052,281 @@ input[type="time"].quick-number {
   font-size: 12px;
 }
 
+.weekly-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.weekly-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.weekly-header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.weekly-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.weekly-overview {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 180px;
+  gap: 18px;
+  align-items: start;
+}
+
+.weekly-card-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.weekly-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.weekly-calendar-day {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 2px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.weekly-calendar-day strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.weekly-calendar-day:hover,
+.weekly-calendar-day.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.weekly-calendar-day.today {
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.weekly-add-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.weekly-add-form input,
+.weekly-add-form select,
+.weekly-day-add input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: #fff;
+}
+
+.weekly-add-form input {
+  flex: 1;
+}
+
+.weekly-add-form button,
+.weekly-day-add button {
+  white-space: nowrap;
+}
+
+.weekly-plan-list {
+  display: grid;
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.weekly-plan-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+  background: #f7f9fc;
+}
+
+.weekly-plan-item span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-plan-item small {
+  color: var(--muted);
+}
+
+.weekly-plan-item.done span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.weekly-status-number {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.weekly-status-detail {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.weekly-status-bar {
+  height: 8px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef1f5;
+}
+
+.weekly-status-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.weekly-days {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.weekly-day-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.weekly-day-row.today {
+  outline: 2px solid var(--primary-soft);
+  outline-offset: 3px;
+  border-radius: 16px;
+}
+
+.weekly-day-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.weekly-day-title strong {
+  font-size: 14px;
+}
+
+.weekly-day-title span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.weekly-day-task-list {
+  display: grid;
+  gap: 6px;
+}
+
+.weekly-task-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.weekly-task-title {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-task-item.done .weekly-task-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.weekly-task-time {
+  width: 90px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+
+.weekly-task-delete {
+  border: 0;
+  background: transparent;
+  color: #c4c9d2;
+  font-size: 15px;
+}
+
+.weekly-task-delete:hover {
+  color: var(--danger);
+}
+
+.weekly-day-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.weekly-day-add input {
+  flex: 1;
+}
+
+.weekly-day-diary textarea {
+  width: 100%;
+  min-height: 130px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  background: #fff;
+}
+
+.weekly-day-diary textarea:focus {
+  outline: 2px solid var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.weekly-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 @media (max-width: 1180px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
@@ -1032,6 +1334,15 @@ input[type="time"].quick-number {
 
   .side-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .weekly-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-calendar-card,
+  .weekly-status-card {
+    max-width: 420px;
   }
 }
 
@@ -1067,5 +1378,13 @@ input[type="time"].quick-number {
 
   .overview {
     align-items: flex-start;
+  }
+
+  .weekly-day-row {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-add-form {
+    flex-direction: column;
   }
 }
