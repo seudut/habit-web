@@ -39,6 +39,7 @@ function createDatabase() {
       unit TEXT NOT NULL DEFAULT 'boolean',
       color TEXT NOT NULL DEFAULT '#3b82f6',
       sort_order INTEGER NOT NULL DEFAULT 0,
+      is_template INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -86,7 +87,17 @@ function migrateSchema(db: Database.Database) {
     .prepare("SELECT value FROM meta WHERE key = 'schema_version'")
     .get() as { value: string } | undefined;
   const currentVersion = Number(version?.value ?? 0);
-  if (currentVersion >= 3) {
+
+  const habitColumns = db
+    .prepare("PRAGMA table_info(habits)")
+    .all() as Array<{ name: string }>;
+  if (!habitColumns.some((column) => column.name === "is_template")) {
+    db.exec(
+      "ALTER TABLE habits ADD COLUMN is_template INTEGER NOT NULL DEFAULT 1",
+    );
+  }
+
+  if (currentVersion >= 4) {
     backfillMonthSnapshots(db);
     return;
   }
@@ -113,31 +124,26 @@ function migrateSchema(db: Database.Database) {
     ).run();
   }
 
+  const snapshotCount = db
+    .prepare("SELECT COUNT(*) AS count FROM month_habit_snapshots")
+    .get() as { count: number };
+  if (snapshotCount.count > 0) {
+    // v3 曾让新月份继承最新快照，这里重建为独立的模板副本。
+    db.exec("DELETE FROM month_habit_snapshots");
+  }
+
   backfillMonthSnapshots(db);
   db.prepare(
-    "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3')",
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '4')",
   ).run();
 }
 
-function getSnapshotHabitRows(
-  db: Database.Database,
-  month: string,
-): Habit[] {
-  return db
-    .prepare(`
-      SELECT habit_id AS id, name, category, target, unit, color, sort_order AS sortOrder
-      FROM month_habit_snapshots
-      WHERE month = ?
-      ORDER BY sort_order
-    `)
-    .all(month) as Habit[];
-}
-
-function getGlobalHabitRows(db: Database.Database): Habit[] {
+function getTemplateHabitRows(db: Database.Database): Habit[] {
   return db
     .prepare(`
       SELECT id, name, category, target, unit, color, sort_order AS sortOrder
       FROM habits
+      WHERE is_template = 1
       ORDER BY sort_order
     `)
     .all() as Habit[];
@@ -156,26 +162,8 @@ export function ensureMonthHabitSnapshot(
     .get(month) as { count: number };
   if (existing.count > 0) return;
 
-  const hasRecords = db
-    .prepare("SELECT 1 FROM records WHERE date LIKE ? LIMIT 1")
-    .get(`${month}-%`);
-  const latestRow = db
-    .prepare("SELECT MAX(month) AS latest FROM month_habit_snapshots")
-    .get() as { latest: string | null } | undefined;
-  const latest = latestRow?.latest ?? null;
-
-  // 历史月份已有记录时使用当前模板冻结；尚未打开的新月份继承最新快照。
-  let rows = getGlobalHabitRows(db);
-  if (
-    !hasRecords &&
-    latest &&
-    month > latest
-  ) {
-    const latestRows = getSnapshotHabitRows(db, latest);
-    if (latestRows.length > 0) {
-      rows = latestRows;
-    }
-  }
+  // 每个月份都从同一个模板复制，互不继承。
+  const rows = getTemplateHabitRows(db);
 
   if (rows.length === 0) return;
 
@@ -416,8 +404,8 @@ export function createHabit(input: HabitInput, month: string) {
 
   const transaction = db.transaction(() => {
     db.prepare(`
-      INSERT INTO habits (id, name, category, target, unit, color, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO habits (id, name, category, target, unit, color, sort_order, is_template)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     `).run(
       habit.id,
       habit.name,
@@ -483,26 +471,6 @@ export function updateHabitForMonth(
     month,
     id,
   );
-
-  const latestRow = db
-    .prepare("SELECT MAX(month) AS latest FROM month_habit_snapshots")
-    .get() as { latest: string | null } | undefined;
-  const latest = latestRow?.latest ?? null;
-  // 只有最新月份编辑会影响后续新月份，已存在的历史/后续快照保持原样。
-  if (latest && month >= latest) {
-    db.prepare(`
-      UPDATE habits
-      SET name = ?, category = ?, target = ?, unit = ?, color = ?
-      WHERE id = ?
-    `).run(
-      next.name,
-      next.category,
-      next.target,
-      next.unit,
-      next.color,
-      id,
-    );
-  }
 
   return next;
 }
