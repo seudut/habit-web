@@ -93,8 +93,34 @@ function createDatabase() {
       PRIMARY KEY (week_start, date)
     );
 
+    CREATE TABLE IF NOT EXISTS weekly_schedule_tasks (
+      id TEXT PRIMARY KEY,
+      week_start TEXT NOT NULL,
+      title TEXT NOT NULL,
+      estimated_duration REAL NOT NULL DEFAULT 0,
+      task_type TEXT NOT NULL DEFAULT 'once',
+      category TEXT NOT NULL DEFAULT 'work',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_task_records (
+      id TEXT PRIMARY KEY,
+      schedule_task_id TEXT NOT NULL REFERENCES weekly_schedule_tasks(id) ON DELETE CASCADE,
+      week_start TEXT NOT NULL,
+      date TEXT NOT NULL,
+      actual_duration REAL NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_weekly_tasks_date
       ON weekly_tasks (week_start, date);
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_schedule_week
+      ON weekly_schedule_tasks (week_start);
+
+    CREATE INDEX IF NOT EXISTS idx_weekly_records_date
+      ON weekly_task_records (week_start, date);
   `);
 
   migrateSchema(db);

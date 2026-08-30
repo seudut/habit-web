@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "./db";
 import type {
+  WeeklyCategory,
   WeeklyData,
   WeeklyDay,
   WeeklyDiary,
+  WeeklyRecord,
   WeeklyTask,
+  WeeklyTaskType,
 } from "./weekly-types";
 
 function pad(value: number) {
@@ -57,16 +60,32 @@ export function getWeeklyData(weekStart: string): WeeklyData {
       SELECT
         id,
         week_start AS weekStart,
-        date,
         title,
-        actual_time AS actualTime,
+        estimated_duration AS estimatedDuration,
+        task_type AS taskType,
+        category,
+        created_at AS createdAt
+      FROM weekly_schedule_tasks
+      WHERE week_start = ?
+      ORDER BY created_at
+    `)
+    .all(start) as WeeklyTask[];
+
+  const records = db
+    .prepare(`
+      SELECT
+        id,
+        schedule_task_id AS scheduleTaskId,
+        week_start AS weekStart,
+        date,
+        actual_duration AS actualDuration,
         completed,
         created_at AS createdAt
-      FROM weekly_tasks
+      FROM weekly_task_records
       WHERE week_start = ?
       ORDER BY date, created_at
     `)
-    .all(start) as WeeklyTask[];
+    .all(start) as WeeklyRecord[];
 
   const diaries = db
     .prepare(`
@@ -81,39 +100,52 @@ export function getWeeklyData(weekStart: string): WeeklyData {
     `)
     .all(start) as WeeklyDiary[];
 
-  const completedTasks = tasks.filter(
-    (task) => task.completed === 1,
+  const completedTasks = records.filter(
+    (record) => record.completed === 1,
   ).length;
 
   return {
     weekStart: start,
     days,
     tasks,
+    records,
     diaries,
-    totalTasks: tasks.length,
+    totalTasks: records.length,
     completedTasks,
     completionRate:
-      tasks.length > 0
-        ? Math.round((completedTasks / tasks.length) * 100)
+      records.length > 0
+        ? Math.round((completedTasks / records.length) * 100)
         : 0,
   };
 }
 
 export function createWeeklyTask({
   weekStart,
-  date,
   title,
+  estimatedDuration,
+  taskType,
+  category,
 }: {
   weekStart: string;
-  date: string;
   title: string;
+  estimatedDuration: number;
+  taskType: WeeklyTaskType;
+  category: WeeklyCategory;
 }) {
   const db = getDatabase();
   const id = randomUUID();
   db.prepare(`
-    INSERT INTO weekly_tasks (id, week_start, date, title)
-    VALUES (?, ?, ?, ?)
-  `).run(id, weekStart, date, title.trim());
+    INSERT INTO weekly_schedule_tasks
+      (id, week_start, title, estimated_duration, task_type, category)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    weekStart,
+    title.trim(),
+    estimatedDuration,
+    taskType,
+    category,
+  );
   return id;
 }
 
@@ -121,32 +153,94 @@ export function updateWeeklyTask(
   id: string,
   input: {
     title?: string;
-    actualTime?: string;
+    estimatedDuration?: number;
+    taskType?: WeeklyTaskType;
+    category?: WeeklyCategory;
+  },
+) {
+  const db = getDatabase();
+  const current = db
+    .prepare("SELECT * FROM weekly_schedule_tasks WHERE id = ?")
+    .get(id) as
+    | {
+        title: string;
+        estimated_duration: number;
+        task_type: string;
+        category: string;
+      }
+    | undefined;
+  if (!current) return false;
+
+  db.prepare(`
+    UPDATE weekly_schedule_tasks
+    SET
+      title = ?,
+      estimated_duration = ?,
+      task_type = ?,
+      category = ?
+    WHERE id = ?
+  `).run(
+    input.title ?? current.title,
+    input.estimatedDuration ?? current.estimated_duration,
+    input.taskType ?? current.task_type,
+    input.category ?? current.category,
+    id,
+  );
+  return true;
+}
+
+export function deleteWeeklyTask(id: string) {
+  const db = getDatabase();
+  db.prepare("DELETE FROM weekly_schedule_tasks WHERE id = ?").run(id);
+}
+
+export function createWeeklyRecord({
+  scheduleTaskId,
+  weekStart,
+  date,
+  actualDuration = 0,
+}: {
+  scheduleTaskId: string;
+  weekStart: string;
+  date: string;
+  actualDuration?: number;
+}) {
+  const db = getDatabase();
+  const id = randomUUID();
+  db.prepare(`
+    INSERT INTO weekly_task_records
+      (id, schedule_task_id, week_start, date, actual_duration)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(id, scheduleTaskId, weekStart, date, actualDuration);
+  return id;
+}
+
+export function updateWeeklyRecord(
+  id: string,
+  input: {
+    actualDuration?: number;
     completed?: boolean;
   },
 ) {
   const db = getDatabase();
   const current = db
-    .prepare("SELECT * FROM weekly_tasks WHERE id = ?")
+    .prepare("SELECT * FROM weekly_task_records WHERE id = ?")
     .get(id) as
     | {
-        title: string;
-        actual_time: string;
+        actual_duration: number;
         completed: number;
       }
     | undefined;
   if (!current) return false;
 
   db.prepare(`
-    UPDATE weekly_tasks
+    UPDATE weekly_task_records
     SET
-      title = ?,
-      actual_time = ?,
+      actual_duration = ?,
       completed = ?
     WHERE id = ?
   `).run(
-    input.title ?? current.title,
-    input.actualTime ?? current.actual_time,
+    input.actualDuration ?? current.actual_duration,
     input.completed === undefined
       ? current.completed
       : input.completed
@@ -157,9 +251,9 @@ export function updateWeeklyTask(
   return true;
 }
 
-export function deleteWeeklyTask(id: string) {
+export function deleteWeeklyRecord(id: string) {
   const db = getDatabase();
-  db.prepare("DELETE FROM weekly_tasks WHERE id = ?").run(id);
+  db.prepare("DELETE FROM weekly_task_records WHERE id = ?").run(id);
 }
 
 export function upsertWeeklyDiary({

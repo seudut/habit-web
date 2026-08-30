@@ -6,6 +6,7 @@ import type { EChartsOption } from "echarts";
 import type {
   WeeklyData,
   WeeklyDiary,
+  WeeklyRecord,
   WeeklyTask,
 } from "@/lib/weekly-types";
 import { EChart } from "./echart";
@@ -65,6 +66,20 @@ const DAILY_HABIT_TEMPLATE = [
   { name: "行禅", count: 0, minutes: 0 },
 ];
 
+const TASK_TYPE_LABELS: Record<string, string> = {
+  once: "Once",
+  daily: "Daily",
+  weekly: "Weekly",
+};
+
+const TASK_CATEGORY_LABELS: Record<string, string> = {
+  recitation: "背诵",
+  practice: "实修",
+  reading: "阅读",
+  work: "工作",
+  leisure: "业余",
+};
+
 function createEmptyDailyChecks() {
   return Object.fromEntries(
     DAILY_HABIT_TEMPLATE.map((habit) => [
@@ -82,9 +97,15 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     initialData.days.find((day) => day.isToday)?.date ??
       initialData.weekStart,
   );
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [dayTaskDrafts, setDayTaskDrafts] = useState<Record<string, string>>({});
-  const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    title: "",
+    estimatedDuration: "",
+    taskType: "once",
+    category: "work",
+  });
+  const [dayTaskSelections, setDayTaskSelections] = useState<Record<string, string>>({});
+  const [recordDurations, setRecordDurations] = useState<Record<string, string>>({});
   const [diaryDrafts, setDiaryDrafts] = useState<Record<string, string>>({});
   const [reviewText, setReviewText] = useState("");
   const [dailyHabitChecks, setDailyHabitChecks] = useState<
@@ -197,22 +218,30 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
 
   async function handleAddTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const title = newTaskTitle.trim();
+    const title = scheduleForm.title.trim();
     if (!title) return;
     const response = await fetch("/api/weekly/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         weekStart,
-        date: selectedDate,
         title,
+        estimatedDuration: Number(scheduleForm.estimatedDuration || 0),
+        taskType: scheduleForm.taskType,
+        category: scheduleForm.category,
       }),
     });
     if (!response.ok) {
       window.alert("添加任务失败");
       return;
     }
-    setNewTaskTitle("");
+    setScheduleModalOpen(false);
+    setScheduleForm({
+      title: "",
+      estimatedDuration: "",
+      taskType: "once",
+      category: "work",
+    });
     await loadWeek(weekStart);
   }
 
@@ -221,18 +250,23 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     date: string,
   ) {
     event.preventDefault();
-    const title = (dayTaskDrafts[date] ?? "").trim();
-    if (!title) return;
-    const response = await fetch("/api/weekly/tasks", {
+    const scheduleTaskId = dayTaskSelections[date];
+    if (!scheduleTaskId) return;
+    const response = await fetch("/api/weekly/records", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weekStart, date, title }),
+      body: JSON.stringify({
+        scheduleTaskId,
+        weekStart,
+        date,
+        actualDuration: 0,
+      }),
     });
     if (!response.ok) {
-      window.alert("添加任务失败");
+      window.alert("添加每日记录失败");
       return;
     }
-    setDayTaskDrafts((current) => {
+    setDayTaskSelections((current) => {
       const next = { ...current };
       delete next[date];
       return next;
@@ -240,29 +274,28 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     await loadWeek(weekStart);
   }
 
-  async function handleUpdateTask(
-    task: WeeklyTask,
-    patch: { title?: string; actualTime?: string; completed?: boolean },
+  async function handleUpdateRecord(
+    record: WeeklyRecord,
+    patch: { actualDuration?: number; completed?: boolean },
   ) {
-    const response = await fetch(`/api/weekly/tasks/${task.id}`, {
+    const response = await fetch(`/api/weekly/records/${record.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
     if (!response.ok) {
-      window.alert("更新任务失败");
+      window.alert("更新每日记录失败");
       return;
     }
     await loadWeek(weekStart);
   }
 
-  async function handleDeleteTask(task: WeeklyTask) {
-    if (!window.confirm(`确定删除“${task.title}”吗？`)) return;
-    const response = await fetch(`/api/weekly/tasks/${task.id}`, {
+  async function handleDeleteRecord(record: WeeklyRecord) {
+    const response = await fetch(`/api/weekly/records/${record.id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
-      window.alert("删除任务失败");
+      window.alert("删除每日记录失败");
       return;
     }
     await loadWeek(weekStart);
@@ -293,6 +326,20 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     await loadWeek(weekStart);
   }
 
+  function openScheduleModal() {
+    setScheduleModalOpen(true);
+  }
+
+  function closeScheduleModal() {
+    setScheduleModalOpen(false);
+    setScheduleForm({
+      title: "",
+      estimatedDuration: "",
+      taskType: "once",
+      category: "work",
+    });
+  }
+
   return (
     <>
       <div className="weekly-header">
@@ -317,43 +364,25 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
         <div className="weekly-main">
           <section className="card weekly-plan-card">
             <h3 className="weekly-card-title">Schedule</h3>
-            <form className="weekly-add-form" onSubmit={handleAddTask}>
-              <input
-                value={newTaskTitle}
-                onChange={(event) => setNewTaskTitle(event.target.value)}
-                placeholder="添加本周任务"
-              />
-              <select
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
+            <div className="weekly-plan-toolbar">
+              <span>{data.tasks.length} tasks</span>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={openScheduleModal}
               >
-                {data.days.map((day) => (
-                  <option key={day.date} value={day.date}>
-                    {day.label} {day.date.slice(8)}
-                  </option>
-                ))}
-              </select>
-              <button className="primary-button" type="submit">
-                添加
+               ＋ New Task
               </button>
-            </form>
+            </div>
             <div className="weekly-plan-list">
               {data.tasks.map((task) => (
-                <div
-                  className={`weekly-plan-item ${task.completed ? "done" : ""}`}
-                  key={task.id}
-                >
-                  <input
-                    type="checkbox"
-                    checked={task.completed === 1}
-                    onChange={(event) =>
-                      handleUpdateTask(task, {
-                        completed: event.target.checked,
-                      })
-                    }
-                  />
+                <div className="weekly-plan-item" key={task.id}>
                   <span>{task.title}</span>
-                  <small>{task.date.slice(8)}</small>
+                  <small>
+                    {task.estimatedDuration || "-"} min ·{" "}
+                    {TASK_TYPE_LABELS[task.taskType]} ·{" "}
+                    {TASK_CATEGORY_LABELS[task.category]}
+                  </small>
                 </div>
               ))}
             </div>
@@ -361,8 +390,16 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
 
           <div className="weekly-days">
             {data.days.map((day) => {
-              const tasks = data.tasks.filter(
-                (task) => task.date === day.date,
+              const records = data.records.filter(
+                (record) => record.date === day.date,
+              );
+              const availableTasks = data.tasks.filter(
+                (task) =>
+                  !data.records.some(
+                    (record) =>
+                      record.date === day.date &&
+                      record.scheduleTaskId === task.id,
+                  ),
               );
               const diary = diaryMap.get(day.date);
               return (
@@ -376,52 +413,61 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                       <span>{day.date}</span>
                     </div>
                     <div className="weekly-day-task-list">
-                      {tasks.length === 0 ? (
-                        <div className="weekly-empty">暂无任务</div>
+                      {records.length === 0 ? (
+                        <div className="weekly-empty">暂无每日记录</div>
                       ) : (
-                        tasks.map((task) => (
-                          <div
-                            className={`weekly-task-item ${task.completed ? "done" : ""}`}
-                            key={task.id}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={task.completed === 1}
-                              onChange={(event) =>
-                                handleUpdateTask(task, {
-                                  completed: event.target.checked,
-                                })
-                              }
-                            />
-                            <span className="weekly-task-title">
-                              {task.title}
-                            </span>
-                            <input
-                              className="weekly-task-time"
-                              value={
-                                timeDrafts[task.id] ?? task.actualTime
-                              }
-                              placeholder="actual time"
-                              onChange={(event) =>
-                                setTimeDrafts((current) => ({
-                                  ...current,
-                                  [task.id]: event.target.value,
-                                }))
-                              }
-                              onBlur={(event) =>
-                                handleUpdateTask(task, {
-                                  actualTime: event.target.value,
-                                })
-                              }
-                            />
-                            <button
-                              className="weekly-task-delete"
-                              onClick={() => handleDeleteTask(task)}
+                        records.map((record) => {
+                          const task = data.tasks.find(
+                            (item) => item.id === record.scheduleTaskId,
+                          );
+                          return (
+                            <div
+                              className={`weekly-task-item ${record.completed ? "done" : ""}`}
+                              key={record.id}
                             >
-                              ×
-                            </button>
-                          </div>
-                        ))
+                              <input
+                                type="checkbox"
+                                checked={record.completed === 1}
+                                onChange={(event) =>
+                                  handleUpdateRecord(record, {
+                                    completed: event.target.checked,
+                                  })
+                                }
+                              />
+                              <span className="weekly-task-title">
+                                {task?.title ?? "未知任务"}
+                              </span>
+                              <input
+                                className="weekly-task-time"
+                                value={
+                                  recordDurations[record.id] ??
+                                  (record.actualDuration
+                                    ? String(record.actualDuration)
+                                    : "")
+                                }
+                                placeholder="actual duration"
+                                onChange={(event) =>
+                                  setRecordDurations((current) => ({
+                                    ...current,
+                                    [record.id]: event.target.value,
+                                  }))
+                                }
+                                onBlur={(event) =>
+                                  handleUpdateRecord(record, {
+                                    actualDuration:
+                                      Number(event.target.value) || 0,
+                                  })
+                                }
+                              />
+                              <button
+                                className="weekly-task-delete"
+                                onClick={() => handleDeleteRecord(record)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                     <form
@@ -430,17 +476,34 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                         handleDayAddTask(event, day.date)
                       }
                     >
-                      <input
-                        value={dayTaskDrafts[day.date] ?? ""}
+                      <select
+                        value={
+                          dayTaskSelections[day.date] ??
+                          availableTasks[0]?.id ??
+                          ""
+                        }
                         onChange={(event) =>
-                          setDayTaskDrafts((current) => ({
+                          setDayTaskSelections((current) => ({
                             ...current,
                             [day.date]: event.target.value,
                           }))
                         }
-                        placeholder="添加当天任务"
-                      />
-                      <button className="primary-button" type="submit">
+                      >
+                        {availableTasks.length === 0 ? (
+                          <option value="">暂无可用任务</option>
+                        ) : (
+                          availableTasks.map((task) => (
+                            <option key={task.id} value={task.id}>
+                              {task.title}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <button
+                        className="primary-button"
+                        type="submit"
+                        disabled={availableTasks.length === 0}
+                      >
                         ＋
                       </button>
                     </form>
@@ -585,6 +648,106 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
           </section>
         </aside>
       </div>
+
+      {scheduleModalOpen && (
+        <div className="habit-modal-overlay" onClick={closeScheduleModal}>
+          <div
+            className="habit-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="card-title">
+              <h2>New Task</h2>
+              <button
+                className="habit-modal-close"
+                onClick={closeScheduleModal}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            <form className="schedule-modal-form" onSubmit={handleAddTask}>
+              <label>
+                Task Name
+                <input
+                  value={scheduleForm.title}
+                  onChange={(event) =>
+                    setScheduleForm((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  placeholder="例如：背诵《心经》"
+                  required
+                />
+              </label>
+              <label>
+                Estimated Duration
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={scheduleForm.estimatedDuration}
+                  onChange={(event) =>
+                    setScheduleForm((current) => ({
+                      ...current,
+                      estimatedDuration: event.target.value,
+                    }))
+                  }
+                  placeholder="分钟"
+                />
+              </label>
+              <div className="schedule-modal-row">
+                <label>
+                  Task Type
+                  <select
+                    value={scheduleForm.taskType}
+                    onChange={(event) =>
+                      setScheduleForm((current) => ({
+                        ...current,
+                        taskType: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="once">Once</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                </label>
+                <label>
+                  Category
+                  <select
+                    value={scheduleForm.category}
+                    onChange={(event) =>
+                      setScheduleForm((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))
+                    }
+                  >
+                    <option value="recitation">背诵</option>
+                    <option value="practice">实修</option>
+                    <option value="reading">阅读</option>
+                    <option value="work">工作</option>
+                    <option value="leisure">业余</option>
+                  </select>
+                </label>
+              </div>
+              <div className="habit-modal-actions">
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={closeScheduleModal}
+                >
+                  取消
+                </button>
+                <button className="primary-button" type="submit">
+                  确认新增
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

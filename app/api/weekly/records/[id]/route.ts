@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
-import { deleteWeeklyTask, updateWeeklyTask } from "@/lib/weekly";
-import type {
-  WeeklyCategory,
-  WeeklyTaskType,
-} from "@/lib/weekly-types";
+import {
+  deleteWeeklyRecord,
+  updateWeeklyRecord,
+} from "@/lib/weekly";
 
 export const dynamic = "force-dynamic";
 
@@ -19,15 +18,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   const body = (await request.json()) as {
-    title?: string;
-    estimatedDuration?: number;
-    taskType?: WeeklyTaskType;
-    category?: WeeklyCategory;
+    actualDuration?: number;
+    completed?: boolean;
   };
 
-  const updated = updateWeeklyTask(id, body);
+  const updated = updateWeeklyRecord(id, body);
   if (!updated) {
-    return NextResponse.json({ error: "任务不存在" }, { status: 404 });
+    return NextResponse.json({ error: "记录不存在" }, { status: 404 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -38,6 +35,6 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  deleteWeeklyTask(id);
+  deleteWeeklyRecord(id);
   return NextResponse.json({ ok: true });
 }

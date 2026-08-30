@@ -1,9 +1,22 @@
+export type WeeklyTaskType = "once" | "daily" | "weekly";
+export type WeeklyCategory = "recitation" | "practice" | "reading" | "work" | "leisure";
+
 export interface WeeklyTask {
   id: string;
   weekStart: string;
-  date: string;
   title: string;
-  actualTime: string;
+  estimatedDuration: number;
+  taskType: WeeklyTaskType;
+  category: WeeklyCategory;
+  createdAt: string;
+}
+
+export interface WeeklyRecord {
+  id: string;
+  scheduleTaskId: string;
+  weekStart: string;
+  date: string;
+  actualDuration: number;
   completed: 0 | 1;
   createdAt: string;
 }
@@ -25,6 +38,7 @@ export interface WeeklyData {
   weekStart: string;
   days: WeeklyDay[];
   tasks: WeeklyTask[];
+  records: WeeklyRecord[];
   diaries: WeeklyDiary[];
   totalTasks: number;
   completedTasks: number;
