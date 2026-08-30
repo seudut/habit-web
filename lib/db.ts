@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { Habit, HabitInput, HabitUnit } from "./types";
+import { getMonthKeyFromDate, isValidMonthKey } from "./month";
 
 let database: Database.Database | null = null;
 
@@ -51,6 +52,22 @@ function createDatabase() {
       PRIMARY KEY (habit_id, date)
     );
 
+    CREATE TABLE IF NOT EXISTS month_habit_snapshots (
+      month TEXT NOT NULL,
+      habit_id TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'other',
+      target REAL NOT NULL DEFAULT 1,
+      unit TEXT NOT NULL DEFAULT 'boolean',
+      color TEXT NOT NULL DEFAULT '#3b82f6',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (month, habit_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_month_habit_snapshots_month
+      ON month_habit_snapshots (month, sort_order);
+
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -68,13 +85,17 @@ function migrateSchema(db: Database.Database) {
   const version = db
     .prepare("SELECT value FROM meta WHERE key = 'schema_version'")
     .get() as { value: string } | undefined;
-  if (version) return;
+  const currentVersion = Number(version?.value ?? 0);
+  if (currentVersion >= 3) {
+    backfillMonthSnapshots(db);
+    return;
+  }
 
   const habitsCount = db
     .prepare("SELECT COUNT(*) AS count FROM habits")
     .get() as { count: number };
 
-  if (habitsCount.count > 0) {
+  if (!version && habitsCount.count > 0) {
     const dbPath = getDatabasePath();
     const backupPath = `${dbPath}.bak-v1`;
     if (!fs.existsSync(backupPath)) {
@@ -83,14 +104,123 @@ function migrateSchema(db: Database.Database) {
     }
   }
 
-  db.exec(`
-    DELETE FROM habits;
-    DELETE FROM meta WHERE key = 'demo_seeded';
-    INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '2');
+  const defaultsSeeded = db
+    .prepare("SELECT value FROM meta WHERE key = 'default_habits_seeded'")
+    .get() as { value: string } | undefined;
+  if (habitsCount.count > 0 && !defaultsSeeded) {
+    db.prepare(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES ('default_habits_seeded', '1')",
+    ).run();
+  }
+
+  backfillMonthSnapshots(db);
+  db.prepare(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3')",
+  ).run();
+}
+
+function getSnapshotHabitRows(
+  db: Database.Database,
+  month: string,
+): Habit[] {
+  return db
+    .prepare(`
+      SELECT habit_id AS id, name, category, target, unit, color, sort_order AS sortOrder
+      FROM month_habit_snapshots
+      WHERE month = ?
+      ORDER BY sort_order
+    `)
+    .all(month) as Habit[];
+}
+
+function getGlobalHabitRows(db: Database.Database): Habit[] {
+  return db
+    .prepare(`
+      SELECT id, name, category, target, unit, color, sort_order AS sortOrder
+      FROM habits
+      ORDER BY sort_order
+    `)
+    .all() as Habit[];
+}
+
+export function ensureMonthHabitSnapshot(
+  month: string,
+  db: Database.Database = getDatabase(),
+) {
+  if (!isValidMonthKey(month)) return;
+
+  const existing = db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM month_habit_snapshots WHERE month = ?",
+    )
+    .get(month) as { count: number };
+  if (existing.count > 0) return;
+
+  const hasRecords = db
+    .prepare("SELECT 1 FROM records WHERE date LIKE ? LIMIT 1")
+    .get(`${month}-%`);
+  const latestRow = db
+    .prepare("SELECT MAX(month) AS latest FROM month_habit_snapshots")
+    .get() as { latest: string | null } | undefined;
+  const latest = latestRow?.latest ?? null;
+
+  // 历史月份已有记录时使用当前模板冻结；尚未打开的新月份继承最新快照。
+  let rows = getGlobalHabitRows(db);
+  if (
+    !hasRecords &&
+    latest &&
+    month > latest
+  ) {
+    const latestRows = getSnapshotHabitRows(db, latest);
+    if (latestRows.length > 0) {
+      rows = latestRows;
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  const insert = db.prepare(`
+    INSERT INTO month_habit_snapshots
+      (month, habit_id, name, category, target, unit, color, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const transaction = db.transaction(() => {
+    rows.forEach((habit) => {
+      insert.run(
+        month,
+        habit.id,
+        habit.name,
+        habit.category,
+        habit.target,
+        habit.unit,
+        habit.color,
+        habit.sortOrder,
+      );
+    });
+  });
+  transaction();
+}
+
+function backfillMonthSnapshots(db: Database.Database) {
+  const months = db
+    .prepare(
+      "SELECT DISTINCT substr(date, 1, 7) AS month FROM records ORDER BY month",
+    )
+    .all() as Array<{ month: string }>;
+
+  for (const row of months) {
+    if (isValidMonthKey(row.month)) {
+      ensureMonthHabitSnapshot(row.month, db);
+    }
+  }
 }
 
 function seedDefaultHabits(db: Database.Database) {
+  const seeded = db
+    .prepare("SELECT value FROM meta WHERE key = 'default_habits_seeded'")
+    .get() as { value: string } | undefined;
+  if (seeded) return;
+
   const defaults: HabitInput[] = [
     {
       name: "早睡",
@@ -184,6 +314,10 @@ function seedDefaultHabits(db: Database.Database) {
   db.prepare(
     "UPDATE habits SET color = ? WHERE name = ? AND category = ? AND color = ?",
   ).run("#4e79a7", "站桩", "practice", "#f28e2b");
+
+  db.prepare(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES ('default_habits_seeded', '1')",
+  ).run();
 }
 
 function seedDemoRecords(db: Database.Database) {
@@ -260,11 +394,16 @@ export function getDatabase() {
   return database;
 }
 
-export function createHabit(input: HabitInput) {
+export function createHabit(input: HabitInput, month: string) {
   const db = getDatabase();
-  const row = db
-    .prepare("SELECT COALESCE(MAX(sort_order), 0) AS nextOrder FROM habits")
-    .get() as { nextOrder: number };
+  ensureMonthHabitSnapshot(month, db);
+
+  const orderRow = db
+    .prepare(
+      "SELECT COALESCE(MAX(sort_order), 0) AS nextOrder FROM month_habit_snapshots WHERE month = ?",
+    )
+    .get(month) as { nextOrder: number };
+  const sortOrder = orderRow.nextOrder + 1;
   const habit: Habit = {
     id: randomUUID(),
     name: input.name.trim(),
@@ -272,33 +411,57 @@ export function createHabit(input: HabitInput) {
     target: input.target,
     unit: input.unit as HabitUnit,
     color: input.color,
-    sortOrder: row.nextOrder + 1,
+    sortOrder,
   };
 
-  db.prepare(`
-    INSERT INTO habits (id, name, category, target, unit, color, sort_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    habit.id,
-    habit.name,
-    habit.category,
-    habit.target,
-    habit.unit,
-    habit.color,
-    habit.sortOrder,
-  );
+  const transaction = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO habits (id, name, category, target, unit, color, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      habit.id,
+      habit.name,
+      habit.category,
+      habit.target,
+      habit.unit,
+      habit.color,
+      habit.sortOrder,
+    );
+
+    db.prepare(`
+      INSERT INTO month_habit_snapshots
+        (month, habit_id, name, category, target, unit, color, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      month,
+      habit.id,
+      habit.name,
+      habit.category,
+      habit.target,
+      habit.unit,
+      habit.color,
+      habit.sortOrder,
+    );
+  });
+  transaction();
 
   return habit;
 }
 
-export function updateHabit(
+export function updateHabitForMonth(
+  month: string,
   id: string,
   input: Partial<HabitInput>,
 ): Habit | null {
   const db = getDatabase();
+  ensureMonthHabitSnapshot(month, db);
   const current = db
-    .prepare("SELECT * FROM habits WHERE id = ?")
-    .get(id) as Habit | undefined;
+    .prepare(`
+      SELECT habit_id AS id, name, category, target, unit, color, sort_order AS sortOrder
+      FROM month_habit_snapshots
+      WHERE month = ? AND habit_id = ?
+    `)
+    .get(month, id) as Habit | undefined;
   if (!current) return null;
 
   const next: Habit = {
@@ -308,24 +471,62 @@ export function updateHabit(
   };
 
   db.prepare(`
-    UPDATE habits
+    UPDATE month_habit_snapshots
     SET name = ?, category = ?, target = ?, unit = ?, color = ?
-    WHERE id = ?
+    WHERE month = ? AND habit_id = ?
   `).run(
     next.name,
     next.category,
     next.target,
     next.unit,
     next.color,
+    month,
     id,
   );
+
+  const latestRow = db
+    .prepare("SELECT MAX(month) AS latest FROM month_habit_snapshots")
+    .get() as { latest: string | null } | undefined;
+  const latest = latestRow?.latest ?? null;
+  // 只有最新月份编辑会影响后续新月份，已存在的历史/后续快照保持原样。
+  if (latest && month >= latest) {
+    db.prepare(`
+      UPDATE habits
+      SET name = ?, category = ?, target = ?, unit = ?, color = ?
+      WHERE id = ?
+    `).run(
+      next.name,
+      next.category,
+      next.target,
+      next.unit,
+      next.color,
+      id,
+    );
+  }
 
   return next;
 }
 
-export function deleteHabit(id: string) {
+export function deleteHabitForMonth(month: string, id: string) {
   const db = getDatabase();
-  db.prepare("DELETE FROM habits WHERE id = ?").run(id);
+  ensureMonthHabitSnapshot(month, db);
+  const existing = db
+    .prepare(
+      "SELECT 1 FROM month_habit_snapshots WHERE month = ? AND habit_id = ?",
+    )
+    .get(month, id);
+  if (!existing) return false;
+
+  const transaction = db.transaction(() => {
+    db.prepare(
+      "DELETE FROM month_habit_snapshots WHERE month = ? AND habit_id = ?",
+    ).run(month, id);
+    db.prepare(
+      "DELETE FROM records WHERE habit_id = ? AND date LIKE ?",
+    ).run(id, `${month}-%`);
+  });
+  transaction();
+  return true;
 }
 
 export function upsertRecord(
@@ -336,6 +537,16 @@ export function upsertRecord(
   note?: string,
 ) {
   const db = getDatabase();
+  const month = getMonthKeyFromDate(date);
+  if (!month) return false;
+  ensureMonthHabitSnapshot(month, db);
+  const active = db
+    .prepare(
+      "SELECT 1 FROM month_habit_snapshots WHERE month = ? AND habit_id = ?",
+    )
+    .get(month, habitId);
+  if (!active) return false;
+
   db.prepare(`
     INSERT INTO records (habit_id, date, value, completed, note)
     VALUES (?, ?, ?, ?, ?)
@@ -345,6 +556,8 @@ export function upsertRecord(
       note = COALESCE(excluded.note, records.note),
       updated_at = datetime('now')
   `).run(habitId, date, value, completed ? 1 : 0, note ?? null);
+
+  return true;
 }
 
 export function deleteRecordsForMonth(month: string) {

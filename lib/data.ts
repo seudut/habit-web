@@ -1,5 +1,6 @@
-import { getDatabase } from "./db";
+import { ensureMonthHabitSnapshot, getDatabase } from "./db";
 import { computeHabitScore } from "./scoring";
+import { getMonthKey } from "./month";
 import type {
   DayInfo,
   DailyStat,
@@ -29,17 +30,24 @@ export function getMonthData(year: number, month: number): MonthData {
   const db = getDatabase();
   const today = getLocalToday();
   const daysInMonth = new Date(year, month, 0).getDate();
-  const monthPrefix = `${year}-${pad(month)}`;
+  const monthPrefix = getMonthKey(year, month);
   const nextMonth = month === 12 ? 1 : month + 1;
   const nextYear = month === 12 ? year + 1 : year;
   const startDate = `${monthPrefix}-01`;
   const endDate = formatDate(nextYear, nextMonth, 1);
 
-  const habits = db
-    .prepare("SELECT * FROM habits ORDER BY sort_order")
-    .all() as Habit[];
+  ensureMonthHabitSnapshot(monthPrefix, db);
 
-  const records = db
+  const habits = db
+    .prepare(`
+      SELECT habit_id AS id, name, category, target, unit, color, sort_order AS sortOrder
+      FROM month_habit_snapshots
+      WHERE month = ?
+      ORDER BY sort_order
+    `)
+    .all(monthPrefix) as Habit[];
+
+  const allRecords = db
     .prepare(`
       SELECT habit_id AS habitId, date, value, completed, note
       FROM records
@@ -47,6 +55,10 @@ export function getMonthData(year: number, month: number): MonthData {
       ORDER BY date
     `)
     .all(startDate, endDate) as RecordEntry[];
+  const activeHabitIds = new Set(habits.map((habit) => habit.id));
+  const records = allRecords.filter((record) =>
+    activeHabitIds.has(record.habitId),
+  );
 
   const days: DayInfo[] = Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1;

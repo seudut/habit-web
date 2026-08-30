@@ -25,13 +25,19 @@ export async function PUT(request: Request) {
   }
 
   const value = Math.max(0, Number(body.value ?? 0));
-  upsertRecord(
+  const saved = upsertRecord(
     body.habitId,
     body.date,
     Number.isFinite(value) ? value : 0,
     Boolean(body.completed),
     body.note,
   );
+  if (!saved) {
+    return NextResponse.json(
+      { error: "该月份不存在此习惯" },
+      { status: 400 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

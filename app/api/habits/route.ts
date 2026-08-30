@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
 import { createHabit } from "@/lib/db";
+import { isValidMonthKey } from "@/lib/month";
 import type { HabitUnit } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,23 +17,30 @@ export async function POST(request: Request) {
     target?: number;
     unit?: HabitUnit;
     color?: string;
+    month?: string;
   };
 
   const name = body.name?.trim();
   if (!name) {
     return NextResponse.json({ error: "习惯名称不能为空" }, { status: 400 });
   }
+  if (!isValidMonthKey(body.month)) {
+    return NextResponse.json({ error: "month 参数无效" }, { status: 400 });
+  }
 
-  const habit = createHabit({
-    name,
-    category: body.category || "other",
-    target:
-      body.unit === "boolean"
-        ? 1
-        : Math.max(0, Number(body.target ?? 0)),
-    unit: body.unit || "boolean",
-    color: body.color || "#3b82f6",
-  });
+  const habit = createHabit(
+    {
+      name,
+      category: body.category || "other",
+      target:
+        body.unit === "boolean"
+          ? 1
+          : Math.max(0, Number(body.target ?? 0)),
+      unit: body.unit || "boolean",
+      color: body.color || "#3b82f6",
+    },
+    body.month,
+  );
 
   return NextResponse.json(habit, { status: 201 });
 }

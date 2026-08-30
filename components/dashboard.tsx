@@ -100,6 +100,7 @@ export function Dashboard({ initialData }: DashboardProps) {
     target: "",
     color: "#3b82f6",
   });
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`;
 
   const recordMap = useMemo(() => {
     const map = new Map<string, RecordEntry>();
@@ -287,9 +288,10 @@ export function Dashboard({ initialData }: DashboardProps) {
       return;
     }
 
-    const response = await fetch(
-      editingHabitId ? `/api/habits/${editingHabitId}` : "/api/habits",
-      {
+    const endpoint = editingHabitId
+      ? `/api/habits/${editingHabitId}?month=${monthKey}`
+      : "/api/habits";
+    const response = await fetch(endpoint, {
       method: editingHabitId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -298,9 +300,9 @@ export function Dashboard({ initialData }: DashboardProps) {
         unit,
         target,
         color: habitForm.color,
+        ...(editingHabitId ? {} : { month: monthKey }),
       }),
-      },
-    );
+    });
 
     if (!response.ok) {
       window.alert(editingHabitId ? "保存习惯失败" : "添加习惯失败");
@@ -313,10 +315,14 @@ export function Dashboard({ initialData }: DashboardProps) {
   }
 
   async function handleDeleteHabit(habit: Habit) {
-    if (!window.confirm(`确定删除“${habit.name}”吗？历史记录会一并删除。`)) {
+    if (
+      !window.confirm(
+        `确定仅从 ${year} 年 ${month} 月移除“${habit.name}”吗？其它月份和历史记录不会受影响。`,
+      )
+    ) {
       return;
     }
-    const response = await fetch(`/api/habits/${habit.id}`, {
+    const response = await fetch(`/api/habits/${habit.id}?month=${monthKey}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -337,7 +343,6 @@ export function Dashboard({ initialData }: DashboardProps) {
     ) {
       return;
     }
-    const monthKey = `${year}-${String(month).padStart(2, "0")}`;
     const response = await fetch(
       `/api/records?month=${monthKey}`,
       { method: "DELETE" },
@@ -360,9 +365,7 @@ export function Dashboard({ initialData }: DashboardProps) {
   let nextMatrixRow = 2;
 
   const today = data.today;
-  const isCurrentMonth = today.startsWith(
-    `${year}-${String(month).padStart(2, "0")}`,
-  );
+  const isCurrentMonth = today.startsWith(monthKey);
 
   return (
     <>
@@ -750,7 +753,8 @@ export function Dashboard({ initialData }: DashboardProps) {
 
           <section className="card">
             <div className="card-title">
-              <h2>管理习惯</h2>
+              <h2>管理本月习惯</h2>
+              <span className="hint">新增、编辑和删除仅影响当前月份</span>
               <button
                 className="manager-add-button"
                 onClick={openAddHabitModal}
