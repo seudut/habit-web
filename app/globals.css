@@ -1085,6 +1085,25 @@ input[type="time"].quick-number {
   align-items: stretch;
 }
 
+.weekly-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+.weekly-main,
+.weekly-side {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.weekly-side {
+  position: sticky;
+  top: 20px;
+}
+
 .weekly-card-title {
   margin: 0 0 12px;
   font-size: 14px;
@@ -1434,9 +1453,13 @@ input[type="time"].quick-number {
     grid-template-columns: 1fr;
   }
 
-  .weekly-calendar-card,
-  .weekly-status-card {
-    max-width: 420px;
+  .weekly-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-side {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1480,5 +1503,9 @@ input[type="time"].quick-number {
 
   .weekly-add-form {
     flex-direction: column;
+  }
+
+  .weekly-side {
+    grid-template-columns: 1fr;
   }
 }

@@ -269,199 +269,209 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
         </div>
       </div>
 
-      <div className="weekly-overview">
-        <section className="card weekly-calendar-card">
-          <h3 className="weekly-card-title">Calendar</h3>
-          <div className="month-calendar">
-            <div className="month-calendar-title">{monthTitle}</div>
-            <div className="month-calendar-weekdays">
-              {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
-                <span key={label}>{label}</span>
-              ))}
-            </div>
-            <div className="month-calendar-grid">
-              {monthGrid.map((cell) => (
-                <button
-                  key={cell.date}
-                  className={`month-calendar-cell ${
-                    cell.inMonth ? "" : "outside"
-                  } ${
-                    selectedWeekDates.has(cell.date) ? "week-selected" : ""
-                  } ${cell.date === today ? "today" : ""}`}
-                  onClick={() => {
-                    if (selectedWeekDates.has(cell.date)) {
-                      setSelectedDate(cell.date);
-                    }
-                  }}
-                >
-                  {cell.day}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="card weekly-plan-card">
-          <h3 className="weekly-card-title">Weekly Plan · Todo List</h3>
-          <form className="weekly-add-form" onSubmit={handleAddTask}>
-            <input
-              value={newTaskTitle}
-              onChange={(event) => setNewTaskTitle(event.target.value)}
-              placeholder="添加本周任务"
-            />
-            <select
-              value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
-            >
-              {data.days.map((day) => (
-                <option key={day.date} value={day.date}>
-                  {day.label} {day.date.slice(8)}
-                </option>
-              ))}
-            </select>
-            <button className="primary-button" type="submit">
-              添加
-            </button>
-          </form>
-          <div className="weekly-plan-list">
-            {data.tasks.map((task) => (
-              <div
-                className={`weekly-plan-item ${task.completed ? "done" : ""}`}
-                key={task.id}
+      <div className="weekly-layout">
+        <div className="weekly-main">
+          <section className="card weekly-plan-card">
+            <h3 className="weekly-card-title">Weekly Plan · Todo List</h3>
+            <form className="weekly-add-form" onSubmit={handleAddTask}>
+              <input
+                value={newTaskTitle}
+                onChange={(event) => setNewTaskTitle(event.target.value)}
+                placeholder="添加本周任务"
+              />
+              <select
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
               >
-                <input
-                  type="checkbox"
-                  checked={task.completed === 1}
-                  onChange={(event) =>
-                    handleUpdateTask(task, {
-                      completed: event.target.checked,
-                    })
-                  }
-                />
-                <span>{task.title}</span>
-                <small>{task.date.slice(8)}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="card weekly-status-card">
-          <h3 className="weekly-card-title">Completed Status</h3>
-          <div className="weekly-status-chart">
-            <EChart option={pieOption} height={170} />
-            <div className="weekly-status-overlay">
-              <b>{data.completionRate}%</b>
-              <span>
-                {data.completedTasks} / {data.totalTasks}
-              </span>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="weekly-days">
-        {data.days.map((day) => {
-          const tasks = data.tasks.filter((task) => task.date === day.date);
-          const diary = diaryMap.get(day.date);
-          return (
-            <div
-              className={`weekly-day-row ${day.date === today ? "today" : ""}`}
-              key={day.date}
-            >
-              <section className="card weekly-day-tasks">
-                <div className="weekly-day-title">
-                  <strong>{day.label}</strong>
-                  <span>{day.date}</span>
-                </div>
-                <div className="weekly-day-task-list">
-                  {tasks.length === 0 ? (
-                    <div className="weekly-empty">暂无任务</div>
-                  ) : (
-                    tasks.map((task) => (
-                      <div
-                        className={`weekly-task-item ${task.completed ? "done" : ""}`}
-                        key={task.id}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={task.completed === 1}
-                          onChange={(event) =>
-                            handleUpdateTask(task, {
-                              completed: event.target.checked,
-                            })
-                          }
-                        />
-                        <span className="weekly-task-title">{task.title}</span>
-                        <input
-                          className="weekly-task-time"
-                          value={
-                            timeDrafts[task.id] ?? task.actualTime
-                          }
-                          placeholder="actual time"
-                          onChange={(event) =>
-                            setTimeDrafts((current) => ({
-                              ...current,
-                              [task.id]: event.target.value,
-                            }))
-                          }
-                          onBlur={(event) =>
-                            handleUpdateTask(task, {
-                              actualTime: event.target.value,
-                            })
-                          }
-                        />
-                        <button
-                          className="weekly-task-delete"
-                          onClick={() => handleDeleteTask(task)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <form
-                  className="weekly-day-add"
-                  onSubmit={(event) => handleDayAddTask(event, day.date)}
+                {data.days.map((day) => (
+                  <option key={day.date} value={day.date}>
+                    {day.label} {day.date.slice(8)}
+                  </option>
+                ))}
+              </select>
+              <button className="primary-button" type="submit">
+                添加
+              </button>
+            </form>
+            <div className="weekly-plan-list">
+              {data.tasks.map((task) => (
+                <div
+                  className={`weekly-plan-item ${task.completed ? "done" : ""}`}
+                  key={task.id}
                 >
                   <input
-                    value={dayTaskDrafts[day.date] ?? ""}
+                    type="checkbox"
+                    checked={task.completed === 1}
                     onChange={(event) =>
-                      setDayTaskDrafts((current) => ({
-                        ...current,
-                        [day.date]: event.target.value,
-                      }))
+                      handleUpdateTask(task, {
+                        completed: event.target.checked,
+                      })
                     }
-                    placeholder="添加当天任务"
                   />
-                  <button className="primary-button" type="submit">
-                    ＋
-                  </button>
-                </form>
-              </section>
-
-              <section className="card weekly-day-diary">
-                <div className="weekly-day-title">
-                  <strong>日记</strong>
-                  <span>{day.date}</span>
+                  <span>{task.title}</span>
+                  <small>{task.date.slice(8)}</small>
                 </div>
-                <textarea
-                  value={
-                    diaryDrafts[day.date] ?? diary?.content ?? ""
-                  }
-                  placeholder="记录今天…"
-                  onChange={(event) =>
-                    setDiaryDrafts((current) => ({
-                      ...current,
-                      [day.date]: event.target.value,
-                    }))
-                  }
-                  onBlur={(event) => handleSaveDiary(event, day.date)}
-                />
-              </section>
+              ))}
             </div>
-          );
-        })}
+          </section>
+
+          <div className="weekly-days">
+            {data.days.map((day) => {
+              const tasks = data.tasks.filter(
+                (task) => task.date === day.date,
+              );
+              const diary = diaryMap.get(day.date);
+              return (
+                <div
+                  className={`weekly-day-row ${day.date === today ? "today" : ""}`}
+                  key={day.date}
+                >
+                  <section className="card weekly-day-tasks">
+                    <div className="weekly-day-title">
+                      <strong>{day.label}</strong>
+                      <span>{day.date}</span>
+                    </div>
+                    <div className="weekly-day-task-list">
+                      {tasks.length === 0 ? (
+                        <div className="weekly-empty">暂无任务</div>
+                      ) : (
+                        tasks.map((task) => (
+                          <div
+                            className={`weekly-task-item ${task.completed ? "done" : ""}`}
+                            key={task.id}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={task.completed === 1}
+                              onChange={(event) =>
+                                handleUpdateTask(task, {
+                                  completed: event.target.checked,
+                                })
+                              }
+                            />
+                            <span className="weekly-task-title">
+                              {task.title}
+                            </span>
+                            <input
+                              className="weekly-task-time"
+                              value={
+                                timeDrafts[task.id] ?? task.actualTime
+                              }
+                              placeholder="actual time"
+                              onChange={(event) =>
+                                setTimeDrafts((current) => ({
+                                  ...current,
+                                  [task.id]: event.target.value,
+                                }))
+                              }
+                              onBlur={(event) =>
+                                handleUpdateTask(task, {
+                                  actualTime: event.target.value,
+                                })
+                              }
+                            />
+                            <button
+                              className="weekly-task-delete"
+                              onClick={() => handleDeleteTask(task)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <form
+                      className="weekly-day-add"
+                      onSubmit={(event) =>
+                        handleDayAddTask(event, day.date)
+                      }
+                    >
+                      <input
+                        value={dayTaskDrafts[day.date] ?? ""}
+                        onChange={(event) =>
+                          setDayTaskDrafts((current) => ({
+                            ...current,
+                            [day.date]: event.target.value,
+                          }))
+                        }
+                        placeholder="添加当天任务"
+                      />
+                      <button className="primary-button" type="submit">
+                        ＋
+                      </button>
+                    </form>
+                  </section>
+
+                  <section className="card weekly-day-diary">
+                    <div className="weekly-day-title">
+                      <strong>日记</strong>
+                      <span>{day.date}</span>
+                    </div>
+                    <textarea
+                      value={diaryDrafts[day.date] ?? diary?.content ?? ""}
+                      placeholder="记录今天…"
+                      onChange={(event) =>
+                        setDiaryDrafts((current) => ({
+                          ...current,
+                          [day.date]: event.target.value,
+                        }))
+                      }
+                      onBlur={(event) => handleSaveDiary(event, day.date)}
+                    />
+                  </section>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <aside className="weekly-side">
+          <section className="card weekly-calendar-card">
+            <h3 className="weekly-card-title">Calendar</h3>
+            <div className="month-calendar">
+              <div className="month-calendar-title">{monthTitle}</div>
+              <div className="month-calendar-weekdays">
+                {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
+              </div>
+              <div className="month-calendar-grid">
+                {monthGrid.map((cell) => (
+                  <button
+                    key={cell.date}
+                    className={`month-calendar-cell ${
+                      cell.inMonth ? "" : "outside"
+                    } ${
+                      selectedWeekDates.has(cell.date)
+                        ? "week-selected"
+                        : ""
+                    } ${cell.date === today ? "today" : ""}`}
+                    onClick={() => {
+                      if (selectedWeekDates.has(cell.date)) {
+                        setSelectedDate(cell.date);
+                      }
+                    }}
+                  >
+                    {cell.day}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="card weekly-status-card">
+            <h3 className="weekly-card-title">Completed Status</h3>
+            <div className="weekly-status-chart">
+              <EChart option={pieOption} height={170} />
+              <div className="weekly-status-overlay">
+                <b>{data.completionRate}%</b>
+                <span>
+                  {data.completedTasks} / {data.totalTasks}
+                </span>
+              </div>
+            </div>
+          </section>
+        </aside>
       </div>
     </>
   );
