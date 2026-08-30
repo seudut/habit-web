@@ -2,11 +2,13 @@
 
 import type { FocusEvent, FormEvent } from "react";
 import { useMemo, useState } from "react";
+import type { EChartsOption } from "echarts";
 import type {
   WeeklyData,
   WeeklyDiary,
   WeeklyTask,
 } from "@/lib/weekly-types";
+import { EChart } from "./echart";
 
 function getToday() {
   const now = new Date();
@@ -23,6 +25,33 @@ function addDays(date: string, amount: number) {
   const month = String(next.getMonth() + 1).padStart(2, "0");
   const day = String(next.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getMonthGrid(date: string) {
+  const base = new Date(`${date}T00:00:00`);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const first = new Date(year, month, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - offset);
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const current = new Date(gridStart);
+    current.setDate(gridStart.getDate() + index);
+    return {
+      date: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(current.getDate()).padStart(2, "0")}`,
+      day: current.getDate(),
+      inMonth: current.getMonth() === month,
+    };
+  });
+}
+
+function getMonthTitle(date: string) {
+  const current = new Date(`${date}T00:00:00`);
+  return `${current.getFullYear()} 年 ${current.getMonth() + 1} 月`;
 }
 
 export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
@@ -45,6 +74,47 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     }
     return map;
   }, [data.diaries]);
+
+  const monthTitle = useMemo(() => getMonthTitle(selectedDate), [selectedDate]);
+  const monthGrid = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
+  const selectedWeekDates = useMemo(() => {
+    const dates = new Set<string>();
+    for (let index = 0; index < 7; index += 1) {
+      dates.add(addDays(weekStart, index));
+    }
+    return dates;
+  }, [weekStart]);
+  const pieOption = useMemo<EChartsOption>(
+    () => ({
+      tooltip: {
+        trigger: "item",
+        formatter: (params: any) =>
+          `${params.name}: ${params.value} (${params.percent}%)`,
+      },
+      series: [
+        {
+          type: "pie" as const,
+          radius: ["58%", "82%"],
+          center: ["50%", "50%"],
+          avoidLabelOverlap: false,
+          label: { show: false },
+          emphasis: { scaleSize: 4 },
+          color: ["#22a06b", "#e5e7eb"],
+          data: [
+            {
+              name: "已完成",
+              value: data.completedTasks,
+            },
+            {
+              name: "未完成",
+              value: Math.max(0, data.totalTasks - data.completedTasks),
+            },
+          ],
+        },
+      ],
+    }),
+    [data.completedTasks, data.totalTasks],
+  );
 
   async function loadWeek(nextStart: string) {
     const response = await fetch(`/api/weekly?weekStart=${nextStart}`, {
@@ -202,19 +272,32 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       <div className="weekly-overview">
         <section className="card weekly-calendar-card">
           <h3 className="weekly-card-title">Calendar</h3>
-          <div className="weekly-calendar">
-            {data.days.map((day) => (
-              <button
-                key={day.date}
-                className={`weekly-calendar-day ${
-                  selectedDate === day.date ? "selected" : ""
-                } ${day.date === today ? "today" : ""}`}
-                onClick={() => setSelectedDate(day.date)}
-              >
-                <span>{day.label}</span>
-                <strong>{day.date.slice(8)}</strong>
-              </button>
-            ))}
+          <div className="month-calendar">
+            <div className="month-calendar-title">{monthTitle}</div>
+            <div className="month-calendar-weekdays">
+              {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
+                <span key={label}>{label}</span>
+              ))}
+            </div>
+            <div className="month-calendar-grid">
+              {monthGrid.map((cell) => (
+                <button
+                  key={cell.date}
+                  className={`month-calendar-cell ${
+                    cell.inMonth ? "" : "outside"
+                  } ${
+                    selectedWeekDates.has(cell.date) ? "week-selected" : ""
+                  } ${cell.date === today ? "today" : ""}`}
+                  onClick={() => {
+                    if (selectedWeekDates.has(cell.date)) {
+                      setSelectedDate(cell.date);
+                    }
+                  }}
+                >
+                  {cell.day}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -264,12 +347,14 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
 
         <section className="card weekly-status-card">
           <h3 className="weekly-card-title">Completed Status</h3>
-          <div className="weekly-status-number">{data.completionRate}%</div>
-          <div className="weekly-status-detail">
-            已完成 {data.completedTasks} / {data.totalTasks}
-          </div>
-          <div className="weekly-status-bar">
-            <span style={{ width: `${data.completionRate}%` }} />
+          <div className="weekly-status-chart">
+            <EChart option={pieOption} height={170} />
+            <div className="weekly-status-overlay">
+              <b>{data.completionRate}%</b>
+              <span>
+                {data.completedTasks} / {data.totalTasks}
+              </span>
+            </div>
           </div>
         </section>
       </div>

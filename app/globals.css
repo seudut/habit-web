@@ -1082,12 +1082,80 @@ input[type="time"].quick-number {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr) 180px;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .weekly-card-title {
   margin: 0 0 12px;
   font-size: 14px;
+}
+
+.weekly-overview > .card {
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+
+.month-calendar {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.month-calendar-title {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7f9fc;
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.month-calendar-weekdays,
+.month-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.month-calendar-weekdays {
+  color: var(--muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.month-calendar-grid {
+  flex: 1;
+  grid-auto-rows: 1fr;
+}
+
+.month-calendar-cell {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+}
+
+.month-calendar-cell:hover {
+  border-color: var(--primary);
+}
+
+.month-calendar-cell.outside {
+  color: #c4c9d2;
+}
+
+.month-calendar-cell.week-selected {
+  border-color: #f7c892;
+  background: #fff3e8;
+}
+
+.month-calendar-cell.today {
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .weekly-calendar {
@@ -1189,6 +1257,32 @@ input[type="time"].quick-number {
   font-size: 36px;
   font-weight: 800;
   color: var(--primary);
+}
+
+.weekly-status-chart {
+  position: relative;
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.weekly-status-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.weekly-status-overlay b {
+  font-size: 30px;
+  color: var(--text);
+}
+
+.weekly-status-overlay span {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .weekly-status-detail {
