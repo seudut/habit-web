@@ -1,7 +1,7 @@
 "use client";
 
 import type { FocusEvent, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EChartsOption } from "echarts";
 import type {
   WeeklyData,
@@ -54,6 +54,26 @@ function getMonthTitle(date: string) {
   return `${current.getFullYear()} 年 ${current.getMonth() + 1} 月`;
 }
 
+const DAILY_HABIT_TEMPLATE = [
+  { name: "金刚功", count: 7, minutes: 30 },
+  { name: "敲胆经", count: 0, minutes: 0 },
+  { name: "靠墙蹲", count: 0, minutes: 0 },
+  { name: "金刚跪", count: 0, minutes: 0 },
+  { name: "禁抖音", count: 0, minutes: 0 },
+  { name: "禁水果", count: 0, minutes: 0 },
+  { name: "艾灸膝盖", count: 0, minutes: 0 },
+  { name: "行禅", count: 0, minutes: 0 },
+];
+
+function createEmptyDailyChecks() {
+  return Object.fromEntries(
+    DAILY_HABIT_TEMPLATE.map((habit) => [
+      habit.name,
+      Array.from({ length: 7 }, () => false),
+    ]),
+  );
+}
+
 export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   const [data, setData] = useState(initialData);
   const [weekStart, setWeekStart] = useState(initialData.weekStart);
@@ -66,6 +86,30 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   const [dayTaskDrafts, setDayTaskDrafts] = useState<Record<string, string>>({});
   const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
   const [diaryDrafts, setDiaryDrafts] = useState<Record<string, string>>({});
+  const [reviewText, setReviewText] = useState("");
+  const [dailyHabitChecks, setDailyHabitChecks] = useState<
+    Record<string, boolean[]>
+  >({});
+
+  useEffect(() => {
+    setReviewText(
+      localStorage.getItem(`weekly-review-${weekStart}`) ?? "",
+    );
+    const saved = localStorage.getItem("weekly-daily-habit-checks");
+    if (saved) {
+      setDailyHabitChecks(JSON.parse(saved));
+    } else {
+      setDailyHabitChecks(createEmptyDailyChecks());
+    }
+  }, [weekStart]);
+
+  useEffect(() => {
+    localStorage.setItem(`weekly-review-${weekStart}`, reviewText);
+  }, [weekStart, reviewText]);
+
+  useEffect(() => {
+    localStorage.setItem("weekly-daily-habit-checks", JSON.stringify(dailyHabitChecks));
+  }, [dailyHabitChecks]);
 
   const diaryMap = useMemo(() => {
     const map = new Map<string, WeeklyDiary>();
@@ -272,7 +316,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       <div className="weekly-layout">
         <div className="weekly-main">
           <section className="card weekly-plan-card">
-            <h3 className="weekly-card-title">Weekly Plan · Todo List</h3>
+            <h3 className="weekly-card-title">Schedule</h3>
             <form className="weekly-add-form" onSubmit={handleAddTask}>
               <input
                 value={newTaskTitle}
@@ -423,6 +467,15 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
               );
             })}
           </div>
+
+          <section className="card weekly-review-card">
+            <h3 className="weekly-card-title">Review</h3>
+            <textarea
+              value={reviewText}
+              placeholder="写一下本周回顾…"
+              onChange={(event) => setReviewText(event.target.value)}
+            />
+          </section>
         </div>
 
         <aside className="weekly-side">
@@ -468,6 +521,65 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                 <span>
                   {data.completedTasks} / {data.totalTasks}
                 </span>
+              </div>
+            </div>
+          </section>
+
+          <section className="card weekly-daily-habit-card">
+            <h3 className="weekly-card-title">Daily Habit</h3>
+            <div className="weekly-daily-habit-scroll">
+              <div className="daily-habit-table">
+                <div className="daily-habit-head habit">HABIT</div>
+                <div className="daily-habit-head">Cnt</div>
+                <div className="daily-habit-head">Time(m)</div>
+                {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
+                  <div className="daily-habit-head" key={label}>
+                    {label}
+                  </div>
+                ))}
+                <div className="daily-habit-head">Prog</div>
+
+                {DAILY_HABIT_TEMPLATE.map((habit) => {
+                  const checks = dailyHabitChecks[habit.name] ?? [];
+                  const completed = checks.filter(Boolean).length;
+                  const progress = Math.round((completed / 7) * 100);
+                  return [
+                    <div
+                      className="daily-habit-cell habit"
+                      key={`${habit.name}-name`}
+                    >
+                      {habit.name}
+                    </div>,
+                    <div className="daily-habit-cell" key={`${habit.name}-cnt`}>
+                      {habit.count}
+                    </div>,
+                    <div className="daily-habit-cell" key={`${habit.name}-time`}>
+                      {habit.minutes}
+                    </div>,
+                    ...Array.from({ length: 7 }, (_, index) => (
+                      <div className="daily-habit-cell" key={`${habit.name}-${index}`}>
+                        <input
+                          type="checkbox"
+                          checked={checks[index] ?? false}
+                          onChange={(event) => {
+                            const current = [...(checks ?? [])];
+                            current[index] = event.target.checked;
+                            setDailyHabitChecks((all) => ({
+                              ...all,
+                              [habit.name]: current,
+                            }));
+                          }}
+                        />
+                      </div>
+                    )),
+                    <div
+                      className="daily-habit-cell progress"
+                      key={`${habit.name}-progress`}
+                    >
+                      {progress}%
+                    </div>,
+                  ];
+                })}
               </div>
             </div>
           </section>

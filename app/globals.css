@@ -1435,6 +1435,73 @@ input[type="time"].quick-number {
   border-color: var(--primary);
 }
 
+.weekly-review-card textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  background: #fff;
+}
+
+.weekly-review-card textarea:focus {
+  outline: 2px solid var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.weekly-daily-habit-scroll {
+  overflow-x: auto;
+}
+
+.daily-habit-table {
+  display: grid;
+  grid-template-columns: 58px 22px 34px repeat(7, 17px) 26px;
+  min-width: 258px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.daily-habit-head,
+.daily-habit-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 4px 1px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 9px;
+}
+
+.daily-habit-head {
+  background: #f7d8df;
+  color: #4b5563;
+  font-weight: 700;
+  text-align: center;
+}
+
+.daily-habit-cell.habit {
+  justify-content: flex-start;
+  padding-left: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.daily-habit-cell.progress {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.daily-habit-cell input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--green);
+}
+
 .weekly-empty {
   color: var(--muted);
   font-size: 12px;
