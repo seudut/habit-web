@@ -368,10 +368,19 @@ POST   /api/weekly/tasks
        新增周任务
 
 PATCH  /api/weekly/tasks/:id
-       更新任务、实际时间或完成状态
+       更新周计划任务
 
 DELETE /api/weekly/tasks/:id
        删除任务
+
+POST   /api/weekly/records
+       为某天添加每日记录
+
+PATCH  /api/weekly/records/:id
+       更新每日记录的实际时长或完成状态
+
+DELETE /api/weekly/records/:id
+       删除每日记录
 
 PUT    /api/weekly/diary
        保存某天日记

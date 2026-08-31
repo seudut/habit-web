@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
-import { createWeeklyRecord } from "@/lib/weekly";
+import {
+  createWeeklyRecord,
+  getWeeklyTaskById,
+  hasWeeklyRecordForWeek,
+  hasWeeklyRecordOnDate,
+  isDateWithinWeek,
+  isValidDateString,
+  isValidDuration,
+  normalizeWeekStart,
+} from "@/lib/weekly";
 
 export const dynamic = "force-dynamic";
 
@@ -16,18 +25,60 @@ export async function POST(request: Request) {
     actualDuration?: number;
   };
 
-  if (!body.scheduleTaskId || !body.weekStart || !body.date) {
+  if (
+    typeof body.scheduleTaskId !== "string" ||
+    !isValidDateString(body.weekStart) ||
+    !isValidDateString(body.date)
+  ) {
     return NextResponse.json(
       { error: "scheduleTaskId、weekStart、date 不能为空" },
       { status: 400 },
     );
   }
 
+  const weekStart = normalizeWeekStart(body.weekStart);
+  const task = getWeeklyTaskById(body.scheduleTaskId);
+  if (!task || task.weekStart !== weekStart) {
+    return NextResponse.json(
+      { error: "任务不存在或不属于当前周" },
+      { status: 400 },
+    );
+  }
+  if (!isDateWithinWeek(body.date, weekStart)) {
+    return NextResponse.json(
+      { error: "date 不在当前周内" },
+      { status: 400 },
+    );
+  }
+  if (hasWeeklyRecordOnDate(body.scheduleTaskId, weekStart, body.date)) {
+    return NextResponse.json(
+      { error: "该任务当天已有记录" },
+      { status: 409 },
+    );
+  }
+  if (
+    task.taskType !== "daily" &&
+    hasWeeklyRecordForWeek(body.scheduleTaskId, weekStart)
+  ) {
+    return NextResponse.json(
+      { error: "Once/Weekly 任务本周只能记录一次" },
+      { status: 409 },
+    );
+  }
+
+  const actualDuration = Number(body.actualDuration ?? 0);
+  if (!isValidDuration(actualDuration)) {
+    return NextResponse.json(
+      { error: "actualDuration 必须是非负数" },
+      { status: 400 },
+    );
+  }
+
   const id = createWeeklyRecord({
     scheduleTaskId: body.scheduleTaskId,
-    weekStart: body.weekStart,
+    weekStart,
     date: body.date,
-    actualDuration: Math.max(0, Number(body.actualDuration ?? 0)),
+    actualDuration,
   });
   return NextResponse.json({ ok: true, id }, { status: 201 });
 }

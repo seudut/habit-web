@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
-import { upsertWeeklyDiary } from "@/lib/weekly";
+import {
+  isDateWithinWeek,
+  isValidDateString,
+  normalizeWeekStart,
+  upsertWeeklyDiary,
+} from "@/lib/weekly";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +20,35 @@ export async function PUT(request: Request) {
     content?: string;
   };
 
-  if (!body.weekStart || !body.date) {
+  if (
+    !isValidDateString(body.weekStart) ||
+    !isValidDateString(body.date)
+  ) {
     return NextResponse.json(
       { error: "weekStart、date 不能为空" },
       { status: 400 },
     );
   }
 
+  const weekStart = normalizeWeekStart(body.weekStart);
+  if (!isDateWithinWeek(body.date, weekStart)) {
+    return NextResponse.json(
+      { error: "date 不在当前周内" },
+      { status: 400 },
+    );
+  }
+  if (
+    body.content !== undefined &&
+    typeof body.content !== "string"
+  ) {
+    return NextResponse.json(
+      { error: "content 必须是字符串" },
+      { status: 400 },
+    );
+  }
+
   upsertWeeklyDiary({
-    weekStart: body.weekStart,
+    weekStart,
     date: body.date,
     content: body.content ?? "",
   });

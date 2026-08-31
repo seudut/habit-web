@@ -124,10 +124,48 @@ function createDatabase() {
   `);
 
   migrateSchema(db);
+  deduplicateWeeklyRecords(db);
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_records_task_date
+      ON weekly_task_records (schedule_task_id, week_start, date);
+  `);
   seedDefaultHabits(db);
   seedDemoRecords(db);
 
   return db;
+}
+
+function deduplicateWeeklyRecords(db: Database.Database) {
+  db.prepare(`
+    DELETE FROM weekly_task_records
+    WHERE rowid NOT IN (
+      SELECT MIN(rowid)
+      FROM weekly_task_records
+      GROUP BY schedule_task_id, week_start, date
+    )
+  `).run();
+  db.prepare(`
+    WITH ranked AS (
+      SELECT
+        r.id,
+        ROW_NUMBER() OVER (
+          PARTITION BY r.schedule_task_id, r.week_start
+          ORDER BY
+            r.completed DESC,
+            r.actual_duration DESC,
+            r.created_at DESC,
+            r.rowid ASC
+        ) AS row_number
+      FROM weekly_task_records r
+      INNER JOIN weekly_schedule_tasks s
+        ON s.id = r.schedule_task_id
+      WHERE s.task_type IN ('once', 'weekly')
+    )
+    DELETE FROM weekly_task_records
+    WHERE id IN (
+      SELECT id FROM ranked WHERE row_number > 1
+    )
+  `).run();
 }
 
 function migrateSchema(db: Database.Database) {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { FocusEvent, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { EChartsOption } from "echarts";
 import type {
   WeeklyData,
@@ -26,6 +26,35 @@ function addDays(date: string, amount: number) {
   const month = String(next.getMonth() + 1).padStart(2, "0");
   const day = String(next.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getWeekStart(date: string) {
+  const current = new Date(`${date}T00:00:00`);
+  const day = current.getDay();
+  current.setDate(current.getDate() - (day === 0 ? 6 : day - 1));
+  const year = current.getFullYear();
+  const month = String(current.getMonth() + 1).padStart(2, "0");
+  const dateString = String(current.getDate()).padStart(2, "0");
+  return `${year}-${month}-${dateString}`;
+}
+
+function shiftMonth(date: string, delta: number) {
+  const current = new Date(`${date}T00:00:00`);
+  const next = new Date(current.getFullYear(), current.getMonth() + delta, 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-01`;
+}
+
+async function getResponseError(response: Response, fallback: string) {
+  try {
+    const body = (await response.json()) as { error?: string };
+    if (typeof body.error === "string" && body.error) return body.error;
+  } catch {
+    // Ignore non-JSON error responses.
+  }
+  return fallback;
 }
 
 function getMonthGrid(date: string) {
@@ -53,6 +82,23 @@ function getMonthGrid(date: string) {
 function getMonthTitle(date: string) {
   const current = new Date(`${date}T00:00:00`);
   return `${current.getFullYear()} 年 ${current.getMonth() + 1} 月`;
+}
+
+function formatShortDate(date: string) {
+  const [, month, day] = date.split("-");
+  return `${month}/${day}`;
+}
+
+function getWeekNumber(date: string) {
+  const current = new Date(`${date}T00:00:00`);
+  const dayIndex = (current.getDay() + 6) % 7;
+  current.setDate(current.getDate() - dayIndex + 3);
+  const firstThursday = new Date(current.getFullYear(), 0, 4);
+  const firstDayIndex = (firstThursday.getDay() + 6) % 7;
+  firstThursday.setDate(firstThursday.getDate() - firstDayIndex + 3);
+  return 1 + Math.round(
+    (current.getTime() - firstThursday.getTime()) / 604800000,
+  );
 }
 
 const DAILY_HABIT_TEMPLATE = [
@@ -98,30 +144,51 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       initialData.weekStart,
   );
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(
+    initialData.days.find((day) => day.isToday)?.date ??
+      initialData.weekStart,
+  );
   const [scheduleForm, setScheduleForm] = useState({
     title: "",
     estimatedDuration: "",
     taskType: "once",
     category: "work",
   });
-  const [dayTaskSelections, setDayTaskSelections] = useState<Record<string, string>>({});
+  const [dayTaskMenuOpen, setDayTaskMenuOpen] = useState<Record<string, boolean>>({});
   const [recordDurations, setRecordDurations] = useState<Record<string, string>>({});
   const [diaryDrafts, setDiaryDrafts] = useState<Record<string, string>>({});
   const [reviewText, setReviewText] = useState("");
   const [dailyHabitChecks, setDailyHabitChecks] = useState<
     Record<string, boolean[]>
   >({});
+  const [loadedHabitWeek, setLoadedHabitWeek] = useState<string | null>(null);
+  const loadController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     setReviewText(
       localStorage.getItem(`weekly-review-${weekStart}`) ?? "",
     );
-    const saved = localStorage.getItem("weekly-daily-habit-checks");
-    if (saved) {
-      setDailyHabitChecks(JSON.parse(saved));
-    } else {
+    const storageKey = `weekly-daily-habit-checks-${weekStart}`;
+    const legacyKey = "weekly-daily-habit-checks";
+    const legacySaved = localStorage.getItem(legacyKey);
+    let saved = localStorage.getItem(storageKey);
+    if (legacySaved && !saved) {
+      localStorage.setItem(storageKey, legacySaved);
+      saved = legacySaved;
+    }
+    localStorage.removeItem(legacyKey);
+    try {
+      const parsed = saved ? (JSON.parse(saved) as Record<string, boolean[]>) : null;
+      setDailyHabitChecks(
+        parsed && typeof parsed === "object"
+          ? parsed
+          : createEmptyDailyChecks(),
+      );
+    } catch {
       setDailyHabitChecks(createEmptyDailyChecks());
     }
+    setLoadedHabitWeek(weekStart);
   }, [weekStart]);
 
   useEffect(() => {
@@ -129,8 +196,12 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   }, [weekStart, reviewText]);
 
   useEffect(() => {
-    localStorage.setItem("weekly-daily-habit-checks", JSON.stringify(dailyHabitChecks));
-  }, [dailyHabitChecks]);
+    if (loadedHabitWeek !== weekStart) return;
+    localStorage.setItem(
+      `weekly-daily-habit-checks-${weekStart}`,
+      JSON.stringify(dailyHabitChecks),
+    );
+  }, [dailyHabitChecks, loadedHabitWeek, weekStart]);
 
   const diaryMap = useMemo(() => {
     const map = new Map<string, WeeklyDiary>();
@@ -140,8 +211,15 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     return map;
   }, [data.diaries]);
 
-  const monthTitle = useMemo(() => getMonthTitle(selectedDate), [selectedDate]);
-  const monthGrid = useMemo(() => getMonthGrid(selectedDate), [selectedDate]);
+  const monthTitle = useMemo(() => getMonthTitle(calendarMonth), [calendarMonth]);
+  const monthGrid = useMemo(() => getMonthGrid(calendarMonth), [calendarMonth]);
+  const weekNumbers = useMemo(() => {
+    const rows: string[] = [];
+    for (let index = 0; index < monthGrid.length; index += 7) {
+      rows.push(`W${getWeekNumber(monthGrid[index].date)}`);
+    }
+    return rows;
+  }, [monthGrid]);
   const selectedWeekDates = useMemo(() => {
     const dates = new Set<string>();
     for (let index = 0; index < 7; index += 1) {
@@ -149,6 +227,23 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     }
     return dates;
   }, [weekStart]);
+  const completedTaskIds = useMemo(
+    () =>
+      new Set(
+        data.records
+          .filter((record) => record.completed === 1)
+          .map((record) => record.scheduleTaskId),
+      ),
+    [data.records],
+  );
+  const totalEstimatedMinutes = useMemo(
+    () =>
+      data.tasks.reduce(
+        (total, task) => total + (task.estimatedDuration || 0),
+        0,
+      ),
+    [data.tasks],
+  );
   const pieOption = useMemo<EChartsOption>(
     () => ({
       tooltip: {
@@ -182,23 +277,46 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   );
 
   async function loadWeek(nextStart: string) {
-    const response = await fetch(`/api/weekly?weekStart=${nextStart}`, {
-      cache: "no-store",
-    });
-    if (response.status === 401) {
-      window.location.href = "/login";
-      return;
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
+    try {
+      const response = await fetch(
+        `/api/weekly?weekStart=${encodeURIComponent(nextStart)}`,
+        {
+          cache: "no-store",
+          signal: controller.signal,
+        },
+      );
+      if (controller.signal.aborted) return false;
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return false;
+      }
+      if (!response.ok) {
+        window.alert(await getResponseError(response, "加载周计划失败"));
+        return false;
+      }
+      const nextData = (await response.json()) as WeeklyData;
+      if (controller.signal.aborted) return false;
+      const nextSelectedDate =
+        nextData.days.find((day) => day.isToday)?.date ?? nextData.weekStart;
+      setData(nextData);
+      setWeekStart(nextData.weekStart);
+      setSelectedDate(nextSelectedDate);
+      setCalendarMonth(nextSelectedDate);
+      return true;
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error(error);
+        window.alert("加载周计划失败");
+      }
+      return false;
+    } finally {
+      if (loadController.current === controller) {
+        loadController.current = null;
+      }
     }
-    if (!response.ok) {
-      window.alert("加载周计划失败");
-      return;
-    }
-    const nextData = (await response.json()) as WeeklyData;
-    setData(nextData);
-    setWeekStart(nextData.weekStart);
-    setSelectedDate(
-      nextData.days.find((day) => day.isToday)?.date ?? nextData.weekStart,
-    );
   }
 
   async function navigateWeek(delta: number) {
@@ -206,52 +324,113 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   }
 
   async function goCurrentWeek() {
-    const current = new Date();
-    const day = current.getDay();
-    const offset = day === 0 ? 6 : day - 1;
-    current.setDate(current.getDate() - offset);
-    const year = current.getFullYear();
-    const month = String(current.getMonth() + 1).padStart(2, "0");
-    const date = String(current.getDate()).padStart(2, "0");
-    await loadWeek(`${year}-${month}-${date}`);
+    await loadWeek(getWeekStart(getToday()));
   }
 
-  async function handleAddTask(event: FormEvent<HTMLFormElement>) {
+  async function goToDate(date: string) {
+    const nextWeekStart = getWeekStart(date);
+    if (nextWeekStart !== weekStart) {
+      if (!(await loadWeek(nextWeekStart))) return;
+    } else {
+      loadController.current?.abort();
+    }
+    setSelectedDate(date);
+    setCalendarMonth(date);
+  }
+
+  function shiftCalendarMonth(delta: number) {
+    setCalendarMonth(shiftMonth(calendarMonth, delta));
+  }
+
+  async function handleSaveTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = scheduleForm.title.trim();
     if (!title) return;
-    const response = await fetch("/api/weekly/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        weekStart,
-        title,
-        estimatedDuration: Number(scheduleForm.estimatedDuration || 0),
-        taskType: scheduleForm.taskType,
-        category: scheduleForm.category,
-      }),
-    });
+    const response = await fetch(
+      editingTaskId
+        ? `/api/weekly/tasks/${editingTaskId}`
+        : "/api/weekly/tasks",
+      {
+        method: editingTaskId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weekStart,
+          title,
+          estimatedDuration: Number(scheduleForm.estimatedDuration || 0),
+          taskType: scheduleForm.taskType,
+          category: scheduleForm.category,
+        }),
+      },
+    );
     if (!response.ok) {
-      window.alert("添加任务失败");
+      window.alert(
+        await getResponseError(
+          response,
+          editingTaskId ? "保存任务失败" : "添加任务失败",
+        ),
+      );
       return;
     }
     setScheduleModalOpen(false);
+    setEditingTaskId(null);
+    resetScheduleForm();
+    await loadWeek(weekStart);
+  }
+
+  async function handleDeleteTask(task: WeeklyTask) {
+    if (
+      !window.confirm(
+        `确定删除任务“${task.title}”吗？相关每日记录也会一并删除。`,
+      )
+    ) {
+      return;
+    }
+    const response = await fetch(`/api/weekly/tasks/${task.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      window.alert(await getResponseError(response, "删除任务失败"));
+      return;
+    }
+    await loadWeek(weekStart);
+  }
+
+  function openScheduleModal(task?: WeeklyTask) {
+    setEditingTaskId(task?.id ?? null);
+    setScheduleForm(
+      task
+        ? {
+            title: task.title,
+            estimatedDuration: String(task.estimatedDuration || ""),
+            taskType: task.taskType,
+            category: task.category,
+          }
+        : {
+            title: "",
+            estimatedDuration: "",
+            taskType: "once",
+            category: "work",
+          },
+    );
+    setScheduleModalOpen(true);
+  }
+
+  function resetScheduleForm() {
     setScheduleForm({
       title: "",
       estimatedDuration: "",
       taskType: "once",
       category: "work",
     });
-    await loadWeek(weekStart);
   }
 
-  async function handleDayAddTask(
-    event: FormEvent<HTMLFormElement>,
-    date: string,
-  ) {
-    event.preventDefault();
-    const scheduleTaskId = dayTaskSelections[date];
-    if (!scheduleTaskId) return;
+  function closeScheduleModal() {
+    setScheduleModalOpen(false);
+    setEditingTaskId(null);
+    resetScheduleForm();
+  }
+
+  async function handleDayAddTask(date: string, scheduleTaskId: string) {
     const response = await fetch("/api/weekly/records", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -263,15 +442,16 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       }),
     });
     if (!response.ok) {
-      window.alert("添加每日记录失败");
+      window.alert(
+        await getResponseError(response, "添加每日记录失败"),
+      );
       return;
     }
-    setDayTaskSelections((current) => {
-      const next = { ...current };
-      delete next[date];
-      return next;
-    });
     await loadWeek(weekStart);
+    setDayTaskMenuOpen((current) => ({
+      ...current,
+      [date]: false,
+    }));
   }
 
   async function handleUpdateRecord(
@@ -284,7 +464,9 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       body: JSON.stringify(patch),
     });
     if (!response.ok) {
-      window.alert("更新每日记录失败");
+      window.alert(
+        await getResponseError(response, "更新每日记录失败"),
+      );
       return;
     }
     await loadWeek(weekStart);
@@ -295,7 +477,9 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       method: "DELETE",
     });
     if (!response.ok) {
-      window.alert("删除每日记录失败");
+      window.alert(
+        await getResponseError(response, "删除每日记录失败"),
+      );
       return;
     }
     await loadWeek(weekStart);
@@ -315,7 +499,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       }),
     });
     if (!response.ok) {
-      window.alert("保存日记失败");
+      window.alert(await getResponseError(response, "保存日记失败"));
       return;
     }
     setDiaryDrafts((current) => {
@@ -324,20 +508,6 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       return next;
     });
     await loadWeek(weekStart);
-  }
-
-  function openScheduleModal() {
-    setScheduleModalOpen(true);
-  }
-
-  function closeScheduleModal() {
-    setScheduleModalOpen(false);
-    setScheduleForm({
-      title: "",
-      estimatedDuration: "",
-      taskType: "once",
-      category: "work",
-    });
   }
 
   return (
@@ -364,27 +534,50 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
         <div className="weekly-main">
           <section className="card weekly-plan-card">
             <h3 className="weekly-card-title">Schedule</h3>
-            <div className="weekly-plan-toolbar">
-              <span>{data.tasks.length} tasks</span>
+            <div className="weekly-plan-list">
+              {data.tasks.map((task) => {
+                const taskCompleted = completedTaskIds.has(task.id);
+                return (
+                  <div
+                    className={`weekly-plan-item ${taskCompleted ? "done" : ""}`}
+                    key={task.id}
+                  >
+                    <span>{task.title}</span>
+                    <small>
+                      {task.estimatedDuration || "-"} min ·{" "}
+                      {TASK_TYPE_LABELS[task.taskType]} ·{" "}
+                      {TASK_CATEGORY_LABELS[task.category]}
+                    </small>
+                    <div className="weekly-plan-item-actions">
+                      <button
+                        className="weekly-plan-action"
+                        type="button"
+                        onClick={() => openScheduleModal(task)}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        className="weekly-plan-action danger"
+                        type="button"
+                        onClick={() => handleDeleteTask(task)}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
               <button
-                className="primary-button"
+                className="weekly-plan-add-card"
                 type="button"
-                onClick={openScheduleModal}
+                onClick={() => openScheduleModal()}
               >
-               ＋ New Task
+                ＋ New Task
               </button>
             </div>
-            <div className="weekly-plan-list">
-              {data.tasks.map((task) => (
-                <div className="weekly-plan-item" key={task.id}>
-                  <span>{task.title}</span>
-                  <small>
-                    {task.estimatedDuration || "-"} min ·{" "}
-                    {TASK_TYPE_LABELS[task.taskType]} ·{" "}
-                    {TASK_CATEGORY_LABELS[task.category]}
-                  </small>
-                </div>
-              ))}
+            <div className="weekly-plan-summary">
+              <span>总计 {data.tasks.length} tasks</span>
+              <span>总时长 {totalEstimatedMinutes} min</span>
             </div>
           </section>
 
@@ -394,12 +587,18 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                 (record) => record.date === day.date,
               );
               const availableTasks = data.tasks.filter(
-                (task) =>
-                  !data.records.some(
+                (task) => {
+                  const alreadyOnDate = data.records.some(
                     (record) =>
                       record.date === day.date &&
                       record.scheduleTaskId === task.id,
-                  ),
+                  );
+                  if (alreadyOnDate) return false;
+                  if (task.taskType === "daily") return true;
+                  return !data.records.some(
+                    (record) => record.scheduleTaskId === task.id,
+                  );
+                },
               );
               const diary = diaryMap.get(day.date);
               return (
@@ -410,110 +609,122 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                   <section className="card weekly-day-tasks">
                     <div className="weekly-day-title">
                       <strong>{day.label}</strong>
-                      <span>{day.date}</span>
+                      <span>{formatShortDate(day.date)}</span>
                     </div>
                     <div className="weekly-day-task-list">
-                      {records.length === 0 ? (
-                        <div className="weekly-empty">暂无每日记录</div>
-                      ) : (
-                        records.map((record) => {
-                          const task = data.tasks.find(
-                            (item) => item.id === record.scheduleTaskId,
-                          );
-                          return (
-                            <div
-                              className={`weekly-task-item ${record.completed ? "done" : ""}`}
-                              key={record.id}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={record.completed === 1}
-                                onChange={(event) =>
-                                  handleUpdateRecord(record, {
-                                    completed: event.target.checked,
-                                  })
+                      {records.map((record) => {
+                        const task = data.tasks.find(
+                          (item) => item.id === record.scheduleTaskId,
+                        );
+                        if (!task || !task.title.trim()) return null;
+                        return (
+                          <div
+                            className={`weekly-task-item ${record.completed ? "done" : ""}`}
+                            key={record.id}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={record.completed === 1}
+                              onChange={(event) =>
+                                handleUpdateRecord(record, {
+                                  completed: event.target.checked,
+                                })
+                              }
+                            />
+                            <span className="weekly-task-title">
+                              {task.title}
+                            </span>
+                            <input
+                              className="weekly-task-time"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={
+                                recordDurations[record.id] ??
+                                (record.actualDuration
+                                  ? String(record.actualDuration)
+                                  : "")
+                              }
+                              placeholder="min"
+                              aria-label="实际时长（分钟）"
+                              onChange={(event) =>
+                                setRecordDurations((current) => ({
+                                  ...current,
+                                  [record.id]: event.target.value,
+                                }))
+                              }
+                              onBlur={(event) => {
+                                const value = event.target.value;
+                                if (value === "") {
+                                  void handleUpdateRecord(record, {
+                                    actualDuration: 0,
+                                  });
+                                  return;
                                 }
-                              />
-                              <span className="weekly-task-title">
-                                {task?.title ?? "未知任务"}
-                              </span>
-                              <input
-                                className="weekly-task-time"
-                                value={
-                                  recordDurations[record.id] ??
-                                  (record.actualDuration
-                                    ? String(record.actualDuration)
-                                    : "")
-                                }
-                                placeholder="actual duration"
-                                onChange={(event) =>
+                                const duration = Number(value);
+                                if (
+                                  !Number.isFinite(duration) ||
+                                  duration < 0
+                                ) {
                                   setRecordDurations((current) => ({
                                     ...current,
-                                    [record.id]: event.target.value,
-                                  }))
+                                    [record.id]: record.actualDuration
+                                      ? String(record.actualDuration)
+                                      : "",
+                                  }));
+                                  return;
                                 }
-                                onBlur={(event) =>
-                                  handleUpdateRecord(record, {
-                                    actualDuration:
-                                      Number(event.target.value) || 0,
-                                  })
-                                }
-                              />
-                              <button
-                                className="weekly-task-delete"
-                                onClick={() => handleDeleteRecord(record)}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          );
-                        })
-                      )}
+                                void handleUpdateRecord(record, {
+                                  actualDuration: duration,
+                                });
+                              }}
+                            />
+                            <button
+                              className="weekly-task-delete"
+                              onClick={() => handleDeleteRecord(record)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <form
-                      className="weekly-day-add"
-                      onSubmit={(event) =>
-                        handleDayAddTask(event, day.date)
-                      }
-                    >
-                      <select
-                        value={
-                          dayTaskSelections[day.date] ??
-                          availableTasks[0]?.id ??
-                          ""
-                        }
-                        onChange={(event) =>
-                          setDayTaskSelections((current) => ({
+                    <div className="weekly-day-add">
+                      <button
+                        className="weekly-day-add-trigger"
+                        type="button"
+                        disabled={availableTasks.length === 0}
+                        aria-expanded={Boolean(dayTaskMenuOpen[day.date])}
+                        onClick={() =>
+                          setDayTaskMenuOpen((current) => ({
                             ...current,
-                            [day.date]: event.target.value,
+                            [day.date]: !current[day.date],
                           }))
                         }
                       >
-                        {availableTasks.length === 0 ? (
-                          <option value="">暂无可用任务</option>
-                        ) : (
-                          availableTasks.map((task) => (
-                            <option key={task.id} value={task.id}>
-                              {task.title}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <button
-                        className="primary-button"
-                        type="submit"
-                        disabled={availableTasks.length === 0}
-                      >
-                        ＋
+                        {dayTaskMenuOpen[day.date] ? "收起" : "＋ 添加"}
                       </button>
-                    </form>
+                      {dayTaskMenuOpen[day.date] &&
+                        availableTasks.length > 0 && (
+                        <div className="weekly-day-add-menu">
+                          {availableTasks.map((task) => (
+                            <button
+                              className="weekly-day-add-option"
+                              type="button"
+                              key={task.id}
+                              onClick={() =>
+                                void handleDayAddTask(day.date, task.id)
+                              }
+                            >
+                              {task.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </section>
 
                   <section className="card weekly-day-diary">
-                    <div className="weekly-day-title">
-                      <strong>日记</strong>
-                      <span>{day.date}</span>
-                    </div>
                     <textarea
                       value={diaryDrafts[day.date] ?? diary?.content ?? ""}
                       placeholder="记录今天…"
@@ -543,34 +754,69 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
 
         <aside className="weekly-side">
           <section className="card weekly-calendar-card">
-            <h3 className="weekly-card-title">Calendar</h3>
             <div className="month-calendar">
-              <div className="month-calendar-title">{monthTitle}</div>
-              <div className="month-calendar-weekdays">
-                {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
-                  <span key={label}>{label}</span>
-                ))}
+              <div className="month-calendar-title">
+                <button
+                  className="month-calendar-nav"
+                  type="button"
+                  aria-label="上个月"
+                  onClick={() => shiftCalendarMonth(-1)}
+                >
+                  ‹
+                </button>
+                <span>{monthTitle}</span>
+                <button
+                  className="month-calendar-nav"
+                  type="button"
+                  aria-label="下个月"
+                  onClick={() => shiftCalendarMonth(1)}
+                >
+                  ›
+                </button>
               </div>
-              <div className="month-calendar-grid">
-                {monthGrid.map((cell) => (
-                  <button
-                    key={cell.date}
-                    className={`month-calendar-cell ${
-                      cell.inMonth ? "" : "outside"
-                    } ${
-                      selectedWeekDates.has(cell.date)
-                        ? "week-selected"
-                        : ""
-                    } ${cell.date === today ? "today" : ""}`}
-                    onClick={() => {
-                      if (selectedWeekDates.has(cell.date)) {
-                        setSelectedDate(cell.date);
-                      }
-                    }}
-                  >
-                    {cell.day}
-                  </button>
-                ))}
+              <div className="month-calendar-body">
+                <div className="month-calendar-week-numbers">
+                  <div
+                    className="month-calendar-week-number-spacer"
+                    aria-hidden="true"
+                  />
+                  {weekNumbers.map((week, index) => (
+                    <div
+                      className="month-calendar-week-number"
+                      key={`${week}-${index}`}
+                    >
+                      {week}
+                    </div>
+                  ))}
+                </div>
+                <div className="month-calendar-weeks">
+                  <div className="month-calendar-weekdays">
+                    {["一", "二", "三", "四", "五", "六", "日"].map(
+                      (label) => (
+                        <span key={label}>{label}</span>
+                      ),
+                    )}
+                  </div>
+                  <div className="month-calendar-grid">
+                    {monthGrid.map((cell) => (
+                      <button
+                        key={cell.date}
+                        className={`month-calendar-cell ${
+                          cell.inMonth ? "" : "outside"
+                        } ${
+                          selectedWeekDates.has(cell.date)
+                            ? "week-selected"
+                            : ""
+                        } ${
+                          cell.date === selectedDate ? "selected" : ""
+                        } ${cell.date === today ? "today" : ""}`}
+                        onClick={() => void goToDate(cell.date)}
+                      >
+                        {cell.day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -654,9 +900,11 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
           <div
             className="habit-modal"
             onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
           >
             <div className="card-title">
-              <h2>New Task</h2>
+              <h2>{editingTaskId ? "Edit Task" : "New Task"}</h2>
               <button
                 className="habit-modal-close"
                 onClick={closeScheduleModal}
@@ -665,7 +913,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                 ×
               </button>
             </div>
-            <form className="schedule-modal-form" onSubmit={handleAddTask}>
+            <form className="schedule-modal-form" onSubmit={handleSaveTask}>
               <label>
                 Task Name
                 <input
@@ -741,7 +989,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                   取消
                 </button>
                 <button className="primary-button" type="submit">
-                  确认新增
+                  {editingTaskId ? "保存修改" : "确认新增"}
                 </button>
               </div>
             </form>

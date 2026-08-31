@@ -1122,12 +1122,59 @@ input[type="time"].quick-number {
 }
 
 .month-calendar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: 8px;
   background: #f7f9fc;
   text-align: center;
   font-weight: 700;
   font-size: 14px;
+}
+
+.month-calendar-body {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.month-calendar-week-numbers {
+  display: grid;
+  grid-template-rows: 18px repeat(6, minmax(38px, 1fr));
+  gap: 4px;
+}
+
+.month-calendar-week-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #f7f9fc;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.month-calendar-weeks {
+  display: grid;
+  grid-template-rows: 18px repeat(6, minmax(38px, 1fr));
+  gap: 4px;
+}
+
+.month-calendar-nav {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.month-calendar-nav:hover {
+  color: var(--primary);
 }
 
 .month-calendar-weekdays,
@@ -1138,14 +1185,17 @@ input[type="time"].quick-number {
 }
 
 .month-calendar-weekdays {
+  grid-row: 1;
+  grid-column: 1;
   color: var(--muted);
   font-size: 10px;
   text-align: center;
 }
 
 .month-calendar-grid {
-  flex: 1;
-  grid-auto-rows: 1fr;
+  grid-row: 2 / 8;
+  grid-column: 1;
+  grid-template-rows: repeat(6, minmax(38px, 1fr));
 }
 
 .month-calendar-cell {
@@ -1154,6 +1204,7 @@ input[type="time"].quick-number {
   border-radius: 6px;
   background: transparent;
   color: var(--text);
+  cursor: pointer;
   font-size: 11px;
   text-align: center;
 }
@@ -1169,6 +1220,13 @@ input[type="time"].quick-number {
 .month-calendar-cell.week-selected {
   border-color: #f7c892;
   background: #fff3e8;
+}
+
+.month-calendar-cell.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .month-calendar-cell.today {
@@ -1253,15 +1311,18 @@ input[type="time"].quick-number {
 
 .weekly-plan-list {
   display: grid;
-  gap: 6px;
-  max-height: 250px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  align-items: start;
+  max-height: 260px;
   overflow-y: auto;
 }
 
 .weekly-plan-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 7px 9px;
@@ -1269,17 +1330,69 @@ input[type="time"].quick-number {
   background: #f7f9fc;
 }
 
+.weekly-plan-add-card {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.weekly-plan-add-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.weekly-plan-summary {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.weekly-plan-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 0;
+}
+
+.weekly-plan-action {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 3px;
+}
+
+.weekly-plan-action:hover {
+  color: var(--primary);
+}
+
+.weekly-plan-action.danger:hover {
+  color: var(--danger);
+}
+
 .weekly-plan-item span {
   min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: 100%;
+  flex: none;
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .weekly-plan-item small {
   color: var(--muted);
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.5;
   font-size: 10px;
 }
 
@@ -1342,33 +1455,53 @@ input[type="time"].quick-number {
 }
 
 .weekly-days {
-  display: grid;
-  gap: 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
   margin-top: 18px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .weekly-day-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 18px;
-  align-items: stretch;
+  flex: 1 1 0;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 12px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
+}
+
+.weekly-day-row > .card {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .weekly-day-row.today {
-  outline: 2px solid var(--primary-soft);
-  outline-offset: 3px;
-  border-radius: 16px;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
 }
 
 .weekly-day-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 6px 4px;
+  border-radius: 10px;
+  background: var(--primary-soft);
 }
 
 .weekly-day-title strong {
+  color: var(--primary);
   font-size: 14px;
 }
 
@@ -1377,23 +1510,47 @@ input[type="time"].quick-number {
   font-size: 11px;
 }
 
+.weekly-day-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 310px;
+  max-height: none;
+  overflow: visible;
+}
+
 .weekly-day-task-list {
   display: grid;
   gap: 6px;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
 }
 
 .weekly-task-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 44px auto;
+  grid-template-rows: auto;
+  gap: 4px;
   align-items: center;
-  gap: 7px;
+  height: 40px;
+  min-height: 40px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 8px;
 }
 
+.weekly-task-item > input[type="checkbox"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 .weekly-task-title {
   min-width: 0;
-  flex: 1;
+  grid-column: 2;
+  grid-row: 1;
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1406,14 +1563,20 @@ input[type="time"].quick-number {
 }
 
 .weekly-task-time {
-  width: 90px;
+  width: 100%;
+  min-width: 0;
+  grid-column: 3;
+  grid-row: 1;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 5px 6px;
-  font-size: 11px;
+  padding: 5px 4px;
+  font-size: 10px;
+  text-align: center;
 }
 
 .weekly-task-delete {
+  grid-column: 4;
+  grid-row: 1;
   border: 0;
   background: transparent;
   color: #c4c9d2;
@@ -1425,23 +1588,85 @@ input[type="time"].quick-number {
 }
 
 .weekly-day-add {
+  position: relative;
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0;
 }
 
-.weekly-day-add input {
-  flex: 1;
+.weekly-day-add-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 6px 8px;
 }
 
-.weekly-day-add select {
-  flex: 1;
-  min-width: 0;
+.weekly-day-add-trigger:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.weekly-day-add-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weekly-day-add-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  bottom: auto;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+}
+
+.weekly-day-add-option {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 5px 6px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekly-day-add-option:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.weekly-day-diary {
+  flex: 0 0 auto;
+  margin-top: auto;
 }
 
 .weekly-day-diary textarea {
   width: 100%;
-  min-height: 130px;
+  height: calc(10 * 1.6em + 22px);
+  min-height: calc(10 * 1.6em + 22px);
   resize: vertical;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -1618,8 +1843,28 @@ input[type="time"].quick-number {
     align-items: flex-start;
   }
 
+  .weekly-plan-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .weekly-days {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    overflow-x: auto;
+  }
+
   .weekly-day-row {
-    grid-template-columns: 1fr;
+    flex: 1 1 0;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .weekly-plan-item-actions {
+    width: auto;
+    justify-content: flex-start;
   }
 
   .weekly-add-form {

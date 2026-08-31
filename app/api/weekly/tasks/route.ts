@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
-import { createWeeklyTask } from "@/lib/weekly";
+import {
+  createWeeklyTask,
+  isValidDateString,
+  isValidDuration,
+  normalizeWeekStart,
+} from "@/lib/weekly";
 import type {
   WeeklyCategory,
   WeeklyTaskType,
 } from "@/lib/weekly-types";
 
 export const dynamic = "force-dynamic";
+
+const TASK_TYPES = new Set<WeeklyTaskType>(["once", "daily", "weekly"]);
+const CATEGORIES = new Set<WeeklyCategory>([
+  "recitation",
+  "practice",
+  "reading",
+  "work",
+  "leisure",
+]);
 
 export async function POST(request: Request) {
   if (!isApiRequestAuthenticated(request)) {
@@ -21,19 +35,37 @@ export async function POST(request: Request) {
     category?: WeeklyCategory;
   };
 
-  if (!body.weekStart || !body.title?.trim()) {
+  const title = typeof body.title === "string" ? body.title : "";
+  if (!isValidDateString(body.weekStart) || !title.trim()) {
     return NextResponse.json(
       { error: "weekStart、title 不能为空" },
       { status: 400 },
     );
   }
 
+  const estimatedDuration = Number(body.estimatedDuration ?? 0);
+  if (!isValidDuration(estimatedDuration)) {
+    return NextResponse.json(
+      { error: "estimatedDuration 必须是非负数" },
+      { status: 400 },
+    );
+  }
+
+  const taskType = body.taskType ?? "once";
+  const category = body.category ?? "work";
+  if (!TASK_TYPES.has(taskType) || !CATEGORIES.has(category)) {
+    return NextResponse.json(
+      { error: "taskType 或 category 无效" },
+      { status: 400 },
+    );
+  }
+
   const id = createWeeklyTask({
-    weekStart: body.weekStart,
-    title: body.title,
-    estimatedDuration: Math.max(0, Number(body.estimatedDuration ?? 0)),
-    taskType: body.taskType ?? "once",
-    category: body.category ?? "work",
+    weekStart: normalizeWeekStart(body.weekStart),
+    title,
+    estimatedDuration,
+    taskType,
+    category,
   });
   return NextResponse.json({ ok: true, id }, { status: 201 });
 }
