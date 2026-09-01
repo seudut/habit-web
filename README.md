@@ -92,6 +92,13 @@ docker compose up -d --build
 habit-data -> /app/data/habits.db
 ```
 
+容器默认使用 `Asia/Shanghai` 作为应用时区，月度页面的“今天”也按该时区计算。若要切换到其他时区，请在 `.env` 中同时设置：
+
+```text
+TZ=Asia/Shanghai
+HABIT_TIME_ZONE=Asia/Shanghai
+```
+
 ## 数据存储
 
 SQLite 是嵌入式文件数据库，不单独启动服务。

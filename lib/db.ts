@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Habit, HabitInput, HabitUnit } from "./types";
 import { getMonthKeyFromDate, isValidMonthKey } from "./month";
+import { getHabitToday } from "./time";
 
 let database: Database.Database | null = null;
 
@@ -318,11 +319,11 @@ function seedDemoRecords(db: Database.Database) {
     .prepare("SELECT id, name, target, unit FROM habits ORDER BY sort_order")
     .all() as Pick<Habit, "id" | "name" | "target" | "unit">[];
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const today = getHabitToday();
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
   const lastDay = new Date(year, month, 0).getDate();
-  const todayDay = now.getDate();
+  const todayDay = Number(today.slice(8, 10));
   const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
 
   const insert = db.prepare(`

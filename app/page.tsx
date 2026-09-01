@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
 import { isSessionValid, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { getMonthData } from "@/lib/data";
+import { getHabitToday } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +23,19 @@ export default async function Home({
   }
 
   const params = await searchParams;
-  const now = new Date();
+  const today = getHabitToday();
   const year = Number(
     Array.isArray(params.year) ? params.year[0] : params.year,
   );
   const month = Number(
     Array.isArray(params.month) ? params.month[0] : params.month,
   );
-  const safeYear = Number.isInteger(year) && year > 1900 ? year : now.getFullYear();
+  const safeYear =
+    Number.isInteger(year) && year > 1900 ? year : Number(today.slice(0, 4));
   const safeMonth =
     Number.isInteger(month) && month >= 1 && month <= 12
       ? month
-      : now.getMonth() + 1;
+      : Number(today.slice(5, 7));
   const data = getMonthData(safeYear, safeMonth);
 
   return (

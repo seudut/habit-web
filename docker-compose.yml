@@ -9,6 +9,8 @@ services:
       - HABIT_ADMIN_PASSWORD=${HABIT_ADMIN_PASSWORD:-change-me}
       - HABIT_SESSION_SECRET=${HABIT_SESSION_SECRET:-change-me}
       - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - TZ=${HABIT_TIME_ZONE:-Asia/Shanghai}
+      - HABIT_TIME_ZONE=${HABIT_TIME_ZONE:-Asia/Shanghai}
     volumes:
       - habit-data:/app/data
     restart: unless-stopped

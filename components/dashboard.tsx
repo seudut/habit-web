@@ -168,9 +168,9 @@ export function Dashboard({ initialData }: DashboardProps) {
   }
 
   async function goToday() {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    const currentToday = data.today;
+    const currentYear = Number(currentToday.slice(0, 4));
+    const currentMonth = Number(currentToday.slice(5, 7));
     setLoading(true);
     setYear(currentYear);
     setMonth(currentMonth);

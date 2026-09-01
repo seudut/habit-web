@@ -1,6 +1,7 @@
 import { ensureMonthHabitSnapshot, getDatabase } from "./db";
 import { computeHabitScore } from "./scoring";
 import { getMonthKey } from "./month";
+import { getHabitToday } from "./time";
 import type {
   DayInfo,
   DailyStat,
@@ -21,14 +22,9 @@ function formatDate(year: number, month: number, day: number) {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
-function getLocalToday() {
-  const now = new Date();
-  return formatDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
-}
-
 export function getMonthData(year: number, month: number): MonthData {
   const db = getDatabase();
-  const today = getLocalToday();
+  const today = getHabitToday();
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthPrefix = getMonthKey(year, month);
   const nextMonth = month === 12 ? 1 : month + 1;
