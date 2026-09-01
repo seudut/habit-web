@@ -20,8 +20,29 @@ export function PracticeDurationChart({
     () => ({
       tooltip: {
         trigger: "axis",
-        valueFormatter: (value) =>
-          typeof value === "number" ? `${value} 分钟` : String(value),
+        formatter: (params: unknown) => {
+          const entries = Array.isArray(params) ? params : [params];
+          return entries
+            .map((entry) => {
+              const item = entry as {
+                seriesName?: string;
+                dataIndex?: number;
+                marker?: string;
+                value?: number | string;
+              };
+              const stat = stats.find(
+                (candidate) => candidate.name === item.seriesName,
+              );
+              const rawValue =
+                typeof item.dataIndex === "number"
+                  ? stat?.values[item.dataIndex]
+                  : undefined;
+              const displayValue =
+                typeof rawValue === "number" ? rawValue : item.value;
+              return `${item.marker ?? ""}${item.seriesName ?? ""}：${displayValue ?? ""} 分钟`;
+            })
+            .join("<br/>");
+        },
       },
       legend: {
         type: "scroll",
@@ -92,7 +113,9 @@ export function PracticeDurationChart({
           borderColor: stat.color,
           borderWidth: 1,
         },
-        data: stat.values.map((value) => (value > 0 ? value : null)),
+        data: stat.values.map((value) =>
+          value > 0 ? Math.min(value, max) : null,
+        ),
       })),
     }),
     [stats, interval],
