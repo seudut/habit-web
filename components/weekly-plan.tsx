@@ -89,6 +89,12 @@ function formatShortDate(date: string) {
   return `${month}/${day}`;
 }
 
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes % 60);
+  return hours > 0 ? `${hours}h ${rest}m` : `${rest}m`;
+}
+
 function getWeekNumber(date: string) {
   const current = new Date(`${date}T00:00:00`);
   const dayIndex = (current.getDay() + 6) % 7;
@@ -101,7 +107,13 @@ function getWeekNumber(date: string) {
   );
 }
 
-const DAILY_HABIT_TEMPLATE = [
+type DailyHabit = {
+  name: string;
+  count: number;
+  minutes: number;
+};
+
+const DAILY_HABIT_TEMPLATE: DailyHabit[] = [
   { name: "金刚功", count: 7, minutes: 30 },
   { name: "敲胆经", count: 0, minutes: 0 },
   { name: "靠墙蹲", count: 0, minutes: 0 },
@@ -126,9 +138,25 @@ const TASK_CATEGORY_LABELS: Record<string, string> = {
   leisure: "业余",
 };
 
-function createEmptyDailyChecks() {
+function normalizeDailyHabits(value: unknown) {
+  if (!Array.isArray(value)) return DAILY_HABIT_TEMPLATE;
+  const habits = value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        Boolean(item) && typeof item === "object",
+    )
+    .map((item) => ({
+      name: typeof item.name === "string" ? item.name.trim() : "",
+      count: Math.max(0, Number(item.count) || 0),
+      minutes: Math.max(0, Number(item.minutes) || 0),
+    }))
+    .filter((habit) => habit.name);
+  return habits;
+}
+
+function createEmptyDailyChecks(habits: readonly DailyHabit[]) {
   return Object.fromEntries(
-    DAILY_HABIT_TEMPLATE.map((habit) => [
+    habits.map((habit) => [
       habit.name,
       Array.from({ length: 7 }, () => false),
     ]),
@@ -162,6 +190,14 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   const [dailyHabitChecks, setDailyHabitChecks] = useState<
     Record<string, boolean[]>
   >({});
+  const [dailyHabits, setDailyHabits] =
+    useState<DailyHabit[]>(DAILY_HABIT_TEMPLATE);
+  const [dailyHabitFormOpen, setDailyHabitFormOpen] = useState(false);
+  const [dailyHabitForm, setDailyHabitForm] = useState({
+    name: "",
+    count: "1",
+    minutes: "30",
+  });
   const [loadedHabitWeek, setLoadedHabitWeek] = useState<string | null>(null);
   const loadController = useRef<AbortController | null>(null);
 
@@ -170,6 +206,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       localStorage.getItem(`weekly-review-${weekStart}`) ?? "",
     );
     const storageKey = `weekly-daily-habit-checks-${weekStart}`;
+    const habitsStorageKey = `weekly-daily-habits-${weekStart}`;
     const legacyKey = "weekly-daily-habit-checks";
     const legacySaved = localStorage.getItem(legacyKey);
     let saved = localStorage.getItem(storageKey);
@@ -178,15 +215,25 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       saved = legacySaved;
     }
     localStorage.removeItem(legacyKey);
+    let habits = DAILY_HABIT_TEMPLATE;
+    try {
+      const savedHabits = localStorage.getItem(habitsStorageKey);
+      habits = normalizeDailyHabits(
+        savedHabits ? JSON.parse(savedHabits) : null,
+      );
+    } catch {
+      habits = DAILY_HABIT_TEMPLATE;
+    }
+    setDailyHabits(habits);
     try {
       const parsed = saved ? (JSON.parse(saved) as Record<string, boolean[]>) : null;
       setDailyHabitChecks(
         parsed && typeof parsed === "object"
           ? parsed
-          : createEmptyDailyChecks(),
+          : createEmptyDailyChecks(habits),
       );
     } catch {
-      setDailyHabitChecks(createEmptyDailyChecks());
+      setDailyHabitChecks(createEmptyDailyChecks(habits));
     }
     setLoadedHabitWeek(weekStart);
   }, [weekStart]);
@@ -202,6 +249,14 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       JSON.stringify(dailyHabitChecks),
     );
   }, [dailyHabitChecks, loadedHabitWeek, weekStart]);
+
+  useEffect(() => {
+    if (loadedHabitWeek !== weekStart) return;
+    localStorage.setItem(
+      `weekly-daily-habits-${weekStart}`,
+      JSON.stringify(dailyHabits),
+    );
+  }, [dailyHabits, loadedHabitWeek, weekStart]);
 
   const diaryMap = useMemo(() => {
     const map = new Map<string, WeeklyDiary>();
@@ -227,6 +282,12 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     }
     return dates;
   }, [weekStart]);
+  const selectedWeekRowIndex = useMemo(() => {
+    const index = monthGrid.findIndex((cell) =>
+      selectedWeekDates.has(cell.date),
+    );
+    return index >= 0 ? Math.floor(index / 7) : -1;
+  }, [monthGrid, selectedWeekDates]);
   const completedTaskIds = useMemo(
     () =>
       new Set(
@@ -243,6 +304,37 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
         0,
       ),
     [data.tasks],
+  );
+  const totalDailyHabitMinutes = useMemo(
+    () =>
+      dailyHabits.reduce(
+        (total, habit) => total + habit.count * habit.minutes,
+        0,
+      ),
+    [dailyHabits],
+  );
+  const forceDurationMinutes = useMemo(
+    () =>
+      data.records
+        .filter((record) => record.completed === 1)
+        .reduce((total, record) => total + (record.actualDuration || 0), 0),
+    [data.records],
+  );
+  const durationStats = useMemo(
+    () => [
+      { key: "total", label: "Total", value: 7 * 60 * 7 },
+      {
+        key: "schedule",
+        label: "Schedule",
+        value: totalEstimatedMinutes + totalDailyHabitMinutes,
+      },
+      {
+        key: "force",
+        label: "Force",
+        value: forceDurationMinutes,
+      },
+    ],
+    [totalEstimatedMinutes, totalDailyHabitMinutes, forceDurationMinutes],
   );
   const pieOption = useMemo<EChartsOption>(
     () => ({
@@ -508,6 +600,61 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       return next;
     });
     await loadWeek(weekStart);
+  }
+
+  function resetDailyHabitForm() {
+    setDailyHabitForm({
+      name: "",
+      count: "1",
+      minutes: "30",
+    });
+  }
+
+  function closeDailyHabitForm() {
+    setDailyHabitFormOpen(false);
+    resetDailyHabitForm();
+  }
+
+  function handleAddDailyHabit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = dailyHabitForm.name.trim();
+    if (!name) return;
+    if (dailyHabits.some((habit) => habit.name === name)) {
+      window.alert("该习惯已存在");
+      return;
+    }
+    const count = Math.max(0, Number(dailyHabitForm.count) || 0);
+    const minutes = Math.max(0, Number(dailyHabitForm.minutes) || 0);
+    const nextHabits = [...dailyHabits, { name, count, minutes }];
+    setDailyHabits(nextHabits);
+    setDailyHabitChecks((current) => ({
+      ...current,
+      [name]: Array.from({ length: 7 }, () => false),
+    }));
+    closeDailyHabitForm();
+  }
+
+  function handleDeleteDailyHabit(name: string) {
+    if (!window.confirm(`确定删除习惯“${name}”吗？`)) return;
+    setDailyHabits((current) => current.filter((habit) => habit.name !== name));
+    setDailyHabitChecks((current) => {
+      const next = { ...current };
+      delete next[name];
+      return next;
+    });
+  }
+
+  function handleUpdateDailyHabitMetric(
+    name: string,
+    field: "count" | "minutes",
+    value: string,
+  ) {
+    const numeric = Math.max(0, Number(value) || 0);
+    setDailyHabits((current) =>
+      current.map((habit) =>
+        habit.name === name ? { ...habit, [field]: numeric } : habit,
+      ),
+    );
   }
 
   return (
@@ -782,7 +929,11 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                   />
                   {weekNumbers.map((week, index) => (
                     <div
-                      className="month-calendar-week-number"
+                      className={`month-calendar-week-number ${
+                        index === selectedWeekRowIndex
+                          ? "is-current-week"
+                          : ""
+                      }`}
                       key={`${week}-${index}`}
                     >
                       {week}
@@ -798,22 +949,37 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                     )}
                   </div>
                   <div className="month-calendar-grid">
-                    {monthGrid.map((cell) => (
-                      <button
-                        key={cell.date}
-                        className={`month-calendar-cell ${
-                          cell.inMonth ? "" : "outside"
-                        } ${
-                          selectedWeekDates.has(cell.date)
-                            ? "week-selected"
+                    {Array.from({ length: 6 }, (_, rowIndex) => (
+                      <div
+                        className={`month-calendar-week-row ${
+                          rowIndex === selectedWeekRowIndex
+                            ? "is-current-week"
                             : ""
-                        } ${
-                          cell.date === selectedDate ? "selected" : ""
-                        } ${cell.date === today ? "today" : ""}`}
-                        onClick={() => void goToDate(cell.date)}
+                        }`}
+                        key={rowIndex}
                       >
-                        {cell.day}
-                      </button>
+                        {monthGrid
+                          .slice(rowIndex * 7, rowIndex * 7 + 7)
+                          .map((cell) => (
+                            <button
+                              key={cell.date}
+                              className={`month-calendar-cell ${
+                                cell.inMonth ? "" : "outside"
+                              } ${
+                                selectedWeekDates.has(cell.date)
+                                  ? "week-selected"
+                                  : ""
+                              } ${
+                                cell.date === selectedDate
+                                  ? "selected"
+                                  : ""
+                              } ${cell.date === today ? "today" : ""}`}
+                              onClick={() => void goToDate(cell.date)}
+                            >
+                              {cell.day}
+                            </button>
+                          ))}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -835,7 +1001,75 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
           </section>
 
           <section className="card weekly-daily-habit-card">
-            <h3 className="weekly-card-title">Daily Habit</h3>
+            <div className="weekly-daily-habit-header">
+              <h3 className="weekly-card-title">Daily Habit</h3>
+              <button
+                className="daily-habit-add-button"
+                type="button"
+                aria-label="新增习惯"
+                onClick={() => setDailyHabitFormOpen(true)}
+              >
+                ＋
+              </button>
+            </div>
+            {dailyHabitFormOpen && (
+              <form
+                className="daily-habit-form"
+                onSubmit={handleAddDailyHabit}
+              >
+                <input
+                  value={dailyHabitForm.name}
+                  onChange={(event) =>
+                    setDailyHabitForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder="习惯名称"
+                  required
+                />
+                <div className="daily-habit-form-row">
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={dailyHabitForm.count}
+                    onChange={(event) =>
+                      setDailyHabitForm((current) => ({
+                        ...current,
+                        count: event.target.value,
+                      }))
+                    }
+                    placeholder="次数"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={dailyHabitForm.minutes}
+                    onChange={(event) =>
+                      setDailyHabitForm((current) => ({
+                        ...current,
+                        minutes: event.target.value,
+                      }))
+                    }
+                    placeholder="分钟"
+                  />
+                </div>
+                <div className="daily-habit-form-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={closeDailyHabitForm}
+                  >
+                    取消
+                  </button>
+                  <button className="primary-button" type="submit">
+                    添加
+                  </button>
+                </div>
+              </form>
+            )}
             <div className="weekly-daily-habit-scroll">
               <div className="daily-habit-table">
                 <div className="daily-habit-head habit">HABIT</div>
@@ -848,7 +1082,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                 ))}
                 <div className="daily-habit-head">Prog</div>
 
-                {DAILY_HABIT_TEMPLATE.map((habit) => {
+                {dailyHabits.map((habit) => {
                   const checks = dailyHabitChecks[habit.name] ?? [];
                   const completed = checks.filter(Boolean).length;
                   const progress = Math.round((completed / 7) * 100);
@@ -857,13 +1091,47 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                       className="daily-habit-cell habit"
                       key={`${habit.name}-name`}
                     >
-                      {habit.name}
+                      <span className="daily-habit-name">{habit.name}</span>
+                      <button
+                        className="daily-habit-delete"
+                        type="button"
+                        aria-label={`删除 ${habit.name}`}
+                        onClick={() => handleDeleteDailyHabit(habit.name)}
+                      >
+                        ×
+                      </button>
                     </div>,
                     <div className="daily-habit-cell" key={`${habit.name}-cnt`}>
-                      {habit.count}
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={habit.count}
+                        aria-label={`${habit.name} 每周次数`}
+                        onChange={(event) =>
+                          handleUpdateDailyHabitMetric(
+                            habit.name,
+                            "count",
+                            event.target.value,
+                          )
+                        }
+                      />
                     </div>,
                     <div className="daily-habit-cell" key={`${habit.name}-time`}>
-                      {habit.minutes}
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={habit.minutes}
+                        aria-label={`${habit.name} 每次时长`}
+                        onChange={(event) =>
+                          handleUpdateDailyHabitMetric(
+                            habit.name,
+                            "minutes",
+                            event.target.value,
+                          )
+                        }
+                      />
                     </div>,
                     ...Array.from({ length: 7 }, (_, index) => (
                       <div className="daily-habit-cell" key={`${habit.name}-${index}`}>
@@ -890,6 +1158,37 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                   ];
                 })}
               </div>
+            </div>
+            <div className="daily-habit-summary">
+              总时长 {totalDailyHabitMinutes} min
+            </div>
+          </section>
+
+          <section className="card weekly-duration-card">
+            <h3 className="weekly-card-title">Duration Stats</h3>
+            <div className="duration-stat-list">
+              {durationStats.map((stat) => {
+                const percent = Math.round(
+                  (stat.value / durationStats[0].value) * 100,
+                );
+                const width = Math.min(100, percent);
+                return (
+                  <div className="duration-stat-item" key={stat.key}>
+                    <div className="duration-stat-header">
+                      <span>{stat.label}</span>
+                      <strong>
+                        {formatDuration(stat.value)} · {percent}%
+                      </strong>
+                    </div>
+                    <div className="duration-stat-track">
+                      <div
+                        className={`duration-stat-fill ${stat.key}`}
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </aside>

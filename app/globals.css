@@ -1117,7 +1117,7 @@ input[type="time"].quick-number {
 
 .month-calendar {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
 }
 
@@ -1126,26 +1126,26 @@ input[type="time"].quick-number {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: #f7f9fc;
   text-align: center;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .month-calendar-body {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 6px;
   flex: 1;
   min-height: 0;
 }
 
 .month-calendar-week-numbers {
   display: grid;
-  grid-template-rows: 18px repeat(6, minmax(38px, 1fr));
-  gap: 4px;
+  grid-template-rows: 16px repeat(6, 22px);
+  gap: 2px;
 }
 
 .month-calendar-week-number {
@@ -1155,13 +1155,18 @@ input[type="time"].quick-number {
   border-radius: 6px;
   background: #f7f9fc;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
+}
+
+.month-calendar-week-number.is-current-week {
+  color: #c76a1c;
+  background: #fff3e8;
 }
 
 .month-calendar-weeks {
   display: grid;
-  grid-template-rows: 18px repeat(6, minmax(38px, 1fr));
-  gap: 4px;
+  grid-template-rows: 16px repeat(6, 22px);
+  gap: 2px;
 }
 
 .month-calendar-nav {
@@ -1169,7 +1174,7 @@ input[type="time"].quick-number {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
 }
 
@@ -1177,25 +1182,37 @@ input[type="time"].quick-number {
   color: var(--primary);
 }
 
-.month-calendar-weekdays,
-.month-calendar-grid {
+.month-calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-
-.month-calendar-weekdays {
+  gap: 2px;
   grid-row: 1;
   grid-column: 1;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   text-align: center;
 }
 
 .month-calendar-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(6, 22px);
+  gap: 2px;
   grid-row: 2 / 8;
   grid-column: 1;
-  grid-template-rows: repeat(6, minmax(38px, 1fr));
+}
+
+.month-calendar-week-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.month-calendar-week-row.is-current-week {
+  background: #fff3e8;
+  box-shadow: inset 0 0 0 1px #f7c892;
 }
 
 .month-calendar-cell {
@@ -1205,7 +1222,7 @@ input[type="time"].quick-number {
   background: transparent;
   color: var(--text);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 10px;
   text-align: center;
 }
 
@@ -1218,8 +1235,8 @@ input[type="time"].quick-number {
 }
 
 .month-calendar-cell.week-selected {
-  border-color: #f7c892;
-  background: #fff3e8;
+  border-color: transparent;
+  background: transparent;
 }
 
 .month-calendar-cell.selected {
@@ -1702,10 +1719,73 @@ input[type="time"].quick-number {
   overflow-x: auto;
 }
 
+.weekly-daily-habit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.weekly-daily-habit-header .weekly-card-title {
+  margin: 0;
+}
+
+.daily-habit-add-button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.daily-habit-add-button:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.daily-habit-form {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.daily-habit-form input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: #fff;
+}
+
+.daily-habit-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.daily-habit-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.daily-habit-form-actions button {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
 .daily-habit-table {
   display: grid;
-  grid-template-columns: 58px 22px 34px repeat(7, 17px) 26px;
-  min-width: 258px;
+  grid-template-columns: 58px 30px 38px repeat(7, 15px) 26px;
+  min-width: 257px;
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -1731,10 +1811,34 @@ input[type="time"].quick-number {
 }
 
 .daily-habit-cell.habit {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   justify-content: flex-start;
   padding-left: 4px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.daily-habit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.daily-habit-delete {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #c4c9d2;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+}
+
+.daily-habit-delete:hover {
+  color: var(--danger);
 }
 
 .daily-habit-cell.progress {
@@ -1746,6 +1850,81 @@ input[type="time"].quick-number {
   width: 12px;
   height: 12px;
   accent-color: var(--green);
+}
+
+.daily-habit-cell input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 10px;
+  text-align: center;
+}
+
+.daily-habit-cell input[type="number"]:focus {
+  border-radius: 4px;
+  background: #f7f9fc;
+  outline: 1px solid var(--primary);
+}
+
+.daily-habit-summary {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.weekly-duration-card {
+  display: grid;
+  gap: 12px;
+}
+
+.duration-stat-list {
+  display: grid;
+  gap: 12px;
+}
+
+.duration-stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.duration-stat-header span {
+  color: var(--muted);
+}
+
+.duration-stat-header strong {
+  color: var(--text);
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.duration-stat-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef1f5;
+}
+
+.duration-stat-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.duration-stat-fill.total {
+  background: #94a3b8;
+}
+
+.duration-stat-fill.force {
+  background: var(--green);
 }
 
 .weekly-empty {
