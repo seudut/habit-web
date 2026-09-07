@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { EChartsOption } from "echarts";
+import { getTimeDeviationMinutes } from "@/lib/scoring";
 import type { HabitStat } from "@/lib/types";
 import { EChart } from "./echart";
 
@@ -10,24 +11,6 @@ const MAX_DEVIATION = 3;
 
 function clampDeviation(value: number) {
   return Math.max(MIN_DEVIATION, Math.min(MAX_DEVIATION, value));
-}
-
-function getTimeDeviationMinutes(
-  name: string,
-  target: number,
-  value: number,
-) {
-  const isEarlyRise = name.includes("早起") || target < 12 * 60;
-
-  if (isEarlyRise) {
-    return value - target;
-  }
-
-  if (value < target && value <= 6 * 60) {
-    return 24 * 60 - target + value;
-  }
-
-  return value - target;
 }
 
 function getTimeDeviationHours(
