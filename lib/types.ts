@@ -66,6 +66,7 @@ export interface MonthData {
   year: number;
   month: number;
   today: string;
+  note: string;
   days: DayInfo[];
   habits: Habit[];
   records: RecordEntry[];

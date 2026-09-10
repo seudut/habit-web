@@ -92,6 +92,10 @@ export function Dashboard({ initialData }: DashboardProps) {
   const [loading, setLoading] = useState(false);
   const [matrixDrafts, setMatrixDrafts] = useState<Record<string, string>>({});
   const [quickDrafts, setQuickDrafts] = useState<Record<string, string>>({});
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [noteStatusMap, setNoteStatusMap] = useState<
+    Record<string, "saving" | "saved" | "error">
+  >({});
   const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [habitModalOpen, setHabitModalOpen] = useState(false);
   const [habitForm, setHabitForm] = useState<HabitFormState>({
@@ -199,6 +203,52 @@ export function Dashboard({ initialData }: DashboardProps) {
       throw new Error("保存记录失败");
     }
     await refresh(year, month);
+  }
+
+  async function handleSaveNote(targetMonthKey: string, content: string) {
+    const [targetYear, targetMonth] = targetMonthKey.split("-").map(Number);
+    setNoteStatusMap((current) => ({
+      ...current,
+      [targetMonthKey]: "saving",
+    }));
+
+    try {
+      const response = await fetch("/api/month/note", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          year: targetYear,
+          month: targetMonth,
+          content,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("保存备注失败");
+      }
+
+      setNoteDrafts((current) => {
+        if (current[targetMonthKey] !== content) return current;
+        const next = { ...current };
+        delete next[targetMonthKey];
+        return next;
+      });
+      setData((current) =>
+        `${current.year}-${String(current.month).padStart(2, "0")}` ===
+        targetMonthKey
+          ? { ...current, note: content }
+          : current,
+      );
+      setNoteStatusMap((current) => ({
+        ...current,
+        [targetMonthKey]: "saved",
+      }));
+    } catch (error) {
+      setNoteStatusMap((current) => ({
+        ...current,
+        [targetMonthKey]: "error",
+      }));
+      window.alert(error instanceof Error ? error.message : "保存备注失败");
+    }
   }
 
   async function handleToggle(habit: Habit, date: string) {
@@ -802,6 +852,44 @@ export function Dashboard({ initialData }: DashboardProps) {
                 ))}
               </div>
             </details>
+          </section>
+
+          <section className="card month-note-card">
+            <div className="card-title">
+              <h2>本月备注</h2>
+              <span className="hint">
+                {noteStatusMap[monthKey] === "saving"
+                  ? "保存中…"
+                  : noteStatusMap[monthKey] === "saved"
+                    ? "已保存"
+                    : noteStatusMap[monthKey] === "error"
+                      ? "保存失败，可再次编辑重试"
+                      : `记录 ${month} 月`}
+              </span>
+            </div>
+            <textarea
+              value={noteDrafts[monthKey] ?? data.note}
+              placeholder="写下这个月的记录、想法或总结…"
+              onChange={(event) =>
+                setNoteDrafts((current) => ({
+                  ...current,
+                  [monthKey]: event.target.value,
+                }))
+              }
+              onBlur={(event) => {
+                const content = event.target.value;
+                if (content === data.note) {
+                  setNoteDrafts((current) => {
+                    if (current[monthKey] === undefined) return current;
+                    const next = { ...current };
+                    delete next[monthKey];
+                    return next;
+                  });
+                  return;
+                }
+                void handleSaveNote(monthKey, content);
+              }}
+            />
           </section>
         </aside>
       </div>

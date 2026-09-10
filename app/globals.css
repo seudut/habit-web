@@ -1698,6 +1698,25 @@ input[type="time"].quick-number {
   border-color: var(--primary);
 }
 
+.month-note-card textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  color: inherit;
+  background: #fff;
+}
+
+.month-note-card textarea:focus {
+  outline: 2px solid var(--primary-soft);
+  border-color: var(--primary);
+}
+
 .weekly-review-card textarea {
   width: 100%;
   min-height: 180px;

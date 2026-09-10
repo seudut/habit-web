@@ -75,6 +75,12 @@ function createDatabase() {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS month_notes (
+      month TEXT PRIMARY KEY,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS weekly_tasks (
       id TEXT PRIMARY KEY,
       week_start TEXT NOT NULL,
@@ -620,4 +626,23 @@ export function deleteRecordsForMonth(month: string) {
     .prepare("DELETE FROM records WHERE date LIKE ?")
     .run(`${month}-%`);
   return result.changes;
+}
+
+export function getMonthNote(month: string) {
+  const db = getDatabase();
+  const row = db
+    .prepare("SELECT content FROM month_notes WHERE month = ?")
+    .get(month) as { content: string } | undefined;
+  return row?.content ?? "";
+}
+
+export function upsertMonthNote(month: string, content: string) {
+  const db = getDatabase();
+  db.prepare(`
+    INSERT INTO month_notes (month, content, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(month) DO UPDATE SET
+      content = excluded.content,
+      updated_at = datetime('now')
+  `).run(month, content);
 }

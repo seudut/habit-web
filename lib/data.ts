@@ -1,4 +1,4 @@
-import { ensureMonthHabitSnapshot, getDatabase } from "./db";
+import { ensureMonthHabitSnapshot, getDatabase, getMonthNote } from "./db";
 import { computeHabitScore } from "./scoring";
 import { getMonthKey } from "./month";
 import { getHabitToday } from "./time";
@@ -33,6 +33,7 @@ export function getMonthData(year: number, month: number): MonthData {
   const endDate = formatDate(nextYear, nextMonth, 1);
 
   ensureMonthHabitSnapshot(monthPrefix, db);
+  const note = getMonthNote(monthPrefix);
 
   const habits = db
     .prepare(`
@@ -189,6 +190,7 @@ export function getMonthData(year: number, month: number): MonthData {
     year,
     month,
     today,
+    note,
     days,
     habits,
     records,
