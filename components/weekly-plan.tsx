@@ -114,15 +114,31 @@ type DailyHabit = {
 };
 
 const DAILY_HABIT_TEMPLATE: DailyHabit[] = [
-  { name: "金刚功", count: 7, minutes: 30 },
-  { name: "敲胆经", count: 0, minutes: 0 },
-  { name: "靠墙蹲", count: 0, minutes: 0 },
-  { name: "金刚跪", count: 0, minutes: 0 },
-  { name: "禁抖音", count: 0, minutes: 0 },
-  { name: "禁水果", count: 0, minutes: 0 },
-  { name: "艾灸膝盖", count: 0, minutes: 0 },
-  { name: "行禅", count: 0, minutes: 0 },
+  { name: "金刚功", count: 7, minutes: 20 },
+  { name: "敲胆经", count: 7, minutes: 20 },
 ];
+const DAILY_HABIT_STORAGE_VERSION = "2";
+const LEGACY_DAILY_HABIT_DEFAULTS: Record<
+  string,
+  Pick<DailyHabit, "count" | "minutes">
+> = {
+  金刚功: { count: 7, minutes: 30 },
+  敲胆经: { count: 0, minutes: 0 },
+};
+
+const LEGACY_DAILY_HABIT_NAMES = [
+  "金刚功",
+  "敲胆经",
+  "靠墙蹲",
+  "金刚跪",
+  "禁抖音",
+  "禁水果",
+  "艾灸膝盖",
+  "行禅",
+];
+const REMOVED_DEFAULT_DAILY_HABIT_NAMES = new Set(
+  LEGACY_DAILY_HABIT_NAMES.slice(DAILY_HABIT_TEMPLATE.length),
+);
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   once: "Once",
@@ -151,7 +167,37 @@ function normalizeDailyHabits(value: unknown) {
       minutes: Math.max(0, Number(item.minutes) || 0),
     }))
     .filter((habit) => habit.name);
-  return habits;
+  const savedDefaultNames = habits
+    .map((habit) => habit.name)
+    .filter((name) => LEGACY_DAILY_HABIT_NAMES.includes(name));
+  const hasLegacyDefaultList =
+    savedDefaultNames.length === LEGACY_DAILY_HABIT_NAMES.length &&
+    savedDefaultNames.every(
+      (name, index) => name === LEGACY_DAILY_HABIT_NAMES[index],
+    );
+  return hasLegacyDefaultList
+    ? habits.filter(
+        (habit) => !REMOVED_DEFAULT_DAILY_HABIT_NAMES.has(habit.name),
+      )
+    : habits;
+}
+
+function migrateLegacyDailyHabitDefaults(habits: DailyHabit[]) {
+  return habits.map((habit) => {
+    const legacyDefaults = LEGACY_DAILY_HABIT_DEFAULTS[habit.name];
+    const currentDefaults = DAILY_HABIT_TEMPLATE.find(
+      (item) => item.name === habit.name,
+    );
+    if (
+      !legacyDefaults ||
+      !currentDefaults ||
+      habit.count !== legacyDefaults.count ||
+      habit.minutes !== legacyDefaults.minutes
+    ) {
+      return habit;
+    }
+    return { ...habit, ...currentDefaults };
+  });
 }
 
 function createEmptyDailyChecks(habits: readonly DailyHabit[]) {
@@ -167,6 +213,10 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   const [data, setData] = useState(initialData);
   const [weekStart, setWeekStart] = useState(initialData.weekStart);
   const today = getToday();
+  const todayColumnIndex =
+    getWeekStart(today) === weekStart
+      ? (new Date(`${today}T00:00:00`).getDay() + 6) % 7
+      : -1;
   const [selectedDate, setSelectedDate] = useState(
     initialData.days.find((day) => day.isToday)?.date ??
       initialData.weekStart,
@@ -195,8 +245,8 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   const [dailyHabitFormOpen, setDailyHabitFormOpen] = useState(false);
   const [dailyHabitForm, setDailyHabitForm] = useState({
     name: "",
-    count: "1",
-    minutes: "30",
+    count: "7",
+    minutes: "20",
   });
   const [loadedHabitWeek, setLoadedHabitWeek] = useState<string | null>(null);
   const loadController = useRef<AbortController | null>(null);
@@ -207,6 +257,7 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     );
     const storageKey = `weekly-daily-habit-checks-${weekStart}`;
     const habitsStorageKey = `weekly-daily-habits-${weekStart}`;
+    const habitsVersionKey = `weekly-daily-habits-version-${weekStart}`;
     const legacyKey = "weekly-daily-habit-checks";
     const legacySaved = localStorage.getItem(legacyKey);
     let saved = localStorage.getItem(storageKey);
@@ -221,15 +272,26 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
       habits = normalizeDailyHabits(
         savedHabits ? JSON.parse(savedHabits) : null,
       );
+      if (
+        localStorage.getItem(habitsVersionKey) !==
+        DAILY_HABIT_STORAGE_VERSION
+      ) {
+        habits = migrateLegacyDailyHabitDefaults(habits);
+      }
     } catch {
       habits = DAILY_HABIT_TEMPLATE;
     }
     setDailyHabits(habits);
     try {
       const parsed = saved ? (JSON.parse(saved) as Record<string, boolean[]>) : null;
+      const activeHabitNames = new Set(habits.map((habit) => habit.name));
       setDailyHabitChecks(
         parsed && typeof parsed === "object"
-          ? parsed
+          ? Object.fromEntries(
+              Object.entries(parsed).filter(([name]) =>
+                activeHabitNames.has(name),
+              ),
+            )
           : createEmptyDailyChecks(habits),
       );
     } catch {
@@ -255,6 +317,10 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
     localStorage.setItem(
       `weekly-daily-habits-${weekStart}`,
       JSON.stringify(dailyHabits),
+    );
+    localStorage.setItem(
+      `weekly-daily-habits-version-${weekStart}`,
+      DAILY_HABIT_STORAGE_VERSION,
     );
   }, [dailyHabits, loadedHabitWeek, weekStart]);
 
@@ -605,8 +671,8 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
   function resetDailyHabitForm() {
     setDailyHabitForm({
       name: "",
-      count: "1",
-      minutes: "30",
+      count: "7",
+      minutes: "20",
     });
   }
 
@@ -1075,11 +1141,21 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                 <div className="daily-habit-head habit">HABIT</div>
                 <div className="daily-habit-head">Cnt</div>
                 <div className="daily-habit-head">Time(m)</div>
-                {["一", "二", "三", "四", "五", "六", "日"].map((label) => (
-                  <div className="daily-habit-head" key={label}>
-                    {label}
-                  </div>
-                ))}
+                {["一", "二", "三", "四", "五", "六", "日"].map(
+                  (label, index) => (
+                    <div
+                      className={`daily-habit-head${
+                        index === todayColumnIndex ? " today" : ""
+                      }`}
+                      key={label}
+                      title={
+                        index === todayColumnIndex ? `今天 ${today}` : undefined
+                      }
+                    >
+                      {label}
+                    </div>
+                  ),
+                )}
                 <div className="daily-habit-head">Prog</div>
 
                 {dailyHabits.map((habit) => {
@@ -1134,7 +1210,12 @@ export function WeeklyPlan({ initialData }: { initialData: WeeklyData }) {
                       />
                     </div>,
                     ...Array.from({ length: 7 }, (_, index) => (
-                      <div className="daily-habit-cell" key={`${habit.name}-${index}`}>
+                      <div
+                        className={`daily-habit-cell${
+                          index === todayColumnIndex ? " today" : ""
+                        }`}
+                        key={`${habit.name}-${index}`}
+                      >
                         <input
                           type="checkbox"
                           checked={checks[index] ?? false}

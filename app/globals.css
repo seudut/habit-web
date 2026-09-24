@@ -1829,6 +1829,15 @@ input[type="time"].quick-number {
   text-align: center;
 }
 
+.daily-habit-head.today {
+  background: var(--primary);
+  color: #fff;
+}
+
+.daily-habit-cell.today {
+  background: var(--primary-soft);
+}
+
 .daily-habit-cell.habit {
   display: flex;
   align-items: center;
@@ -1872,6 +1881,8 @@ input[type="time"].quick-number {
 }
 
 .daily-habit-cell input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
   width: 100%;
   min-width: 0;
   border: 0;
@@ -1879,6 +1890,12 @@ input[type="time"].quick-number {
   padding: 2px 0;
   font-size: 10px;
   text-align: center;
+}
+
+.daily-habit-cell input[type="number"]::-webkit-inner-spin-button,
+.daily-habit-cell input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .daily-habit-cell input[type="number"]:focus {
