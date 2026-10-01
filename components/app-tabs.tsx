@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 
-export function AppTabs({ active }: { active: "month" | "weekly" }) {
+export function AppTabs({
+  active,
+}: {
+  active: "month" | "weekly" | "projects";
+}) {
   return (
     <nav className="app-tabs">
       <Link
@@ -18,6 +22,13 @@ export function AppTabs({ active }: { active: "month" | "weekly" }) {
         aria-current={active === "weekly" ? "page" : undefined}
       >
         周计划
+      </Link>
+      <Link
+        className={`app-tab ${active === "projects" ? "active" : ""}`}
+        href="/projects"
+        aria-current={active === "projects" ? "page" : undefined}
+      >
+        项目
       </Link>
     </nav>
   );

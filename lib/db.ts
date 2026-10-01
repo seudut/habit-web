@@ -119,6 +119,29 @@ function createDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#4f7cff',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS project_tasks (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES project_tasks(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      progress REAL NOT NULL DEFAULT 0,
+      color TEXT NOT NULL DEFAULT '#4f7cff',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_weekly_tasks_date
       ON weekly_tasks (week_start, date);
 
@@ -127,6 +150,12 @@ function createDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_weekly_records_date
       ON weekly_task_records (week_start, date);
+
+    CREATE INDEX IF NOT EXISTS idx_project_tasks_project
+      ON project_tasks (project_id, sort_order);
+
+    CREATE INDEX IF NOT EXISTS idx_project_tasks_parent
+      ON project_tasks (parent_id);
   `);
 
   migrateSchema(db);
