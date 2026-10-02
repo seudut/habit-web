@@ -67,6 +67,11 @@ function createDatabase() {
       PRIMARY KEY (month, habit_id)
     );
 
+    CREATE TABLE IF NOT EXISTS month_habit_snapshot_state (
+      month TEXT PRIMARY KEY,
+      template_signature TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_month_habit_snapshots_month
       ON month_habit_snapshots (month, sort_order);
 
@@ -248,7 +253,22 @@ function migrateSchema(db: Database.Database) {
     );
   }
 
+  const snapshotStateColumns = db
+    .prepare("PRAGMA table_info(month_habit_snapshot_state)")
+    .all() as Array<{ name: string }>;
+  if (
+    !snapshotStateColumns.some((column) => column.name === "template_signature")
+  ) {
+    db.exec(
+      "ALTER TABLE month_habit_snapshot_state ADD COLUMN template_signature TEXT",
+    );
+  }
+
   if (currentVersion >= 4) {
+    db.prepare(`
+      INSERT OR IGNORE INTO month_habit_snapshot_state (month)
+      SELECT DISTINCT month FROM month_habit_snapshots
+    `).run();
     backfillMonthSnapshots(db);
     return;
   }
@@ -282,6 +302,7 @@ function migrateSchema(db: Database.Database) {
     // v3 曾让新月份继承最新快照，这里重建为独立的模板副本。
     db.exec("DELETE FROM month_habit_snapshots");
   }
+  db.exec("DELETE FROM month_habit_snapshot_state");
 
   backfillMonthSnapshots(db);
   db.prepare(
@@ -300,23 +321,129 @@ function getTemplateHabitRows(db: Database.Database): Habit[] {
     .all() as Habit[];
 }
 
+function getMonthHabitSnapshotRows(month: string, db: Database.Database) {
+  return db
+    .prepare(`
+      SELECT habit_id AS id, name, category, target, unit, color,
+        sort_order AS sortOrder
+      FROM month_habit_snapshots
+      WHERE month = ?
+      ORDER BY sort_order
+    `)
+    .all(month) as Habit[];
+}
+
+function getHabitSnapshotSignature(habits: Habit[]) {
+  return JSON.stringify(
+    habits.map((habit) => [
+      habit.id,
+      habit.name,
+      habit.category,
+      habit.target,
+      habit.unit,
+      habit.color,
+      habit.sortOrder,
+    ]),
+  );
+}
+
+function replaceMonthHabitSnapshot(
+  month: string,
+  habits: Habit[],
+  templateSignature: string | null,
+  db: Database.Database,
+) {
+  const habitIds = new Set(habits.map((habit) => habit.id));
+  const existingRows = db
+    .prepare("SELECT habit_id AS id FROM month_habit_snapshots WHERE month = ?")
+    .all(month) as Array<{ id: string }>;
+  const deleteRemovedHabitRecords = db.prepare(
+    "DELETE FROM records WHERE habit_id = ? AND date LIKE ?",
+  );
+  existingRows.forEach(({ id }) => {
+    if (!habitIds.has(id)) {
+      deleteRemovedHabitRecords.run(id, `${month}-%`);
+    }
+  });
+
+  db.prepare("DELETE FROM month_habit_snapshots WHERE month = ?").run(month);
+  const insert = db.prepare(`
+    INSERT INTO month_habit_snapshots
+      (month, habit_id, name, category, target, unit, color, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  habits.forEach((habit) => {
+    insert.run(
+      month,
+      habit.id,
+      habit.name,
+      habit.category,
+      habit.target,
+      habit.unit,
+      habit.color,
+      habit.sortOrder,
+    );
+  });
+  db.prepare(`
+    INSERT INTO month_habit_snapshot_state (month, template_signature)
+    VALUES (?, ?)
+    ON CONFLICT(month) DO UPDATE SET
+      template_signature = excluded.template_signature
+  `).run(month, templateSignature);
+}
+
+function syncFutureMonthSnapshotFromCurrentMonth(
+  month: string,
+  currentMonth: string,
+  db: Database.Database,
+) {
+  if (month <= currentMonth) return;
+
+  ensureMonthHabitSnapshot(currentMonth, db);
+  const currentHabits = getMonthHabitSnapshotRows(currentMonth, db);
+  const signature = getHabitSnapshotSignature(currentHabits);
+  const state = db
+    .prepare(
+      `SELECT template_signature AS templateSignature
+       FROM month_habit_snapshot_state WHERE month = ?`,
+    )
+    .get(month) as { templateSignature: string | null } | undefined;
+  if (state?.templateSignature === signature) return;
+
+  const transaction = db.transaction(() => {
+    replaceMonthHabitSnapshot(month, currentHabits, signature, db);
+  });
+  transaction();
+}
+
 export function ensureMonthHabitSnapshot(
   month: string,
   db: Database.Database = getDatabase(),
 ) {
   if (!isValidMonthKey(month)) return;
 
+  const currentMonth = getHabitToday().slice(0, 7);
   const existing = db
     .prepare(
-      "SELECT COUNT(*) AS count FROM month_habit_snapshots WHERE month = ?",
+      `SELECT template_signature AS templateSignature
+       FROM month_habit_snapshot_state WHERE month = ?`,
     )
-    .get(month) as { count: number };
-  if (existing.count > 0) return;
+    .get(month) as { templateSignature: string | null } | undefined;
+  if (existing) {
+    syncFutureMonthSnapshotFromCurrentMonth(month, currentMonth, db);
+    return;
+  }
 
-  // 每个月份都从同一个模板复制，互不继承。
-  const rows = getTemplateHabitRows(db);
-
-  if (rows.length === 0) return;
+  let rows: Habit[];
+  let templateSignature: string | null = null;
+  if (month > currentMonth) {
+    ensureMonthHabitSnapshot(currentMonth, db);
+    rows = getMonthHabitSnapshotRows(currentMonth, db);
+    templateSignature = getHabitSnapshotSignature(rows);
+  } else {
+    // 当前月和历史月份首次创建时仍从基础模板复制。
+    rows = getTemplateHabitRows(db);
+  }
 
   const insert = db.prepare(`
     INSERT INTO month_habit_snapshots
@@ -336,8 +463,33 @@ export function ensureMonthHabitSnapshot(
         habit.sortOrder,
       );
     });
+    db.prepare(`
+      INSERT OR IGNORE INTO month_habit_snapshot_state (month, template_signature)
+      VALUES (?, ?)
+    `).run(month, templateSignature);
   });
   transaction();
+}
+
+function copyCurrentMonthSnapshotToFutureMonths(
+  currentMonth: string,
+  db: Database.Database,
+) {
+  if (currentMonth !== getHabitToday().slice(0, 7)) return;
+
+  const sourceRows = getMonthHabitSnapshotRows(currentMonth, db);
+  const signature = getHabitSnapshotSignature(sourceRows);
+  const futureMonths = db
+    .prepare(`
+      SELECT month
+      FROM month_habit_snapshot_state
+      WHERE month > ?
+      ORDER BY month
+    `)
+    .all(currentMonth) as Array<{ month: string }>;
+  futureMonths.forEach(({ month }) => {
+    replaceMonthHabitSnapshot(month, sourceRows, signature, db);
+  });
 }
 
 function backfillMonthSnapshots(db: Database.Database) {
@@ -581,6 +733,7 @@ export function createHabit(input: HabitInput, month: string) {
       habit.color,
       habit.sortOrder,
     );
+    copyCurrentMonthSnapshotToFutureMonths(month, db);
   });
   transaction();
 
@@ -609,19 +762,23 @@ export function updateHabitForMonth(
     name: (input.name ?? current.name).trim(),
   };
 
-  db.prepare(`
-    UPDATE month_habit_snapshots
-    SET name = ?, category = ?, target = ?, unit = ?, color = ?
-    WHERE month = ? AND habit_id = ?
-  `).run(
-    next.name,
-    next.category,
-    next.target,
-    next.unit,
-    next.color,
-    month,
-    id,
-  );
+  const transaction = db.transaction(() => {
+    db.prepare(`
+      UPDATE month_habit_snapshots
+      SET name = ?, category = ?, target = ?, unit = ?, color = ?
+      WHERE month = ? AND habit_id = ?
+    `).run(
+      next.name,
+      next.category,
+      next.target,
+      next.unit,
+      next.color,
+      month,
+      id,
+    );
+    copyCurrentMonthSnapshotToFutureMonths(month, db);
+  });
+  transaction();
 
   return next;
 }
@@ -643,6 +800,7 @@ export function deleteHabitForMonth(month: string, id: string) {
     db.prepare(
       "DELETE FROM records WHERE habit_id = ? AND date LIKE ?",
     ).run(id, `${month}-%`);
+    copyCurrentMonthSnapshotToFutureMonths(month, db);
   });
   transaction();
   return true;

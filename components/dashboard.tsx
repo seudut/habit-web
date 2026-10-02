@@ -368,7 +368,9 @@ export function Dashboard({ initialData }: DashboardProps) {
   async function handleDeleteHabit(habit: Habit) {
     if (
       !window.confirm(
-        `确定仅从 ${year} 年 ${month} 月移除“${habit.name}”吗？其它月份和历史记录不会受影响。`,
+        isCurrentMonth
+          ? `确定从 ${year} 年 ${month} 月移除“${habit.name}”吗？尚未到来的月份也会同步移除，历史月份不受影响。`
+          : `确定仅从 ${year} 年 ${month} 月移除“${habit.name}”吗？其它月份和历史记录不会受影响。`,
       )
     ) {
       return;
@@ -806,7 +808,11 @@ export function Dashboard({ initialData }: DashboardProps) {
           <section className="card">
             <div className="card-title">
               <h2>管理本月习惯</h2>
-              <span className="hint">新增、编辑和删除仅影响当前月份</span>
+              <span className="hint">
+                {isCurrentMonth
+                  ? "修改本月习惯会同步为未来月份的模板"
+                  : "新增、编辑和删除仅影响当前月份"}
+              </span>
               <button
                 className="manager-add-button"
                 onClick={openAddHabitModal}
@@ -992,7 +998,9 @@ export function Dashboard({ initialData }: DashboardProps) {
               </div>
             </form>
             <p className="hint" style={{ margin: "10px 0 0", fontSize: 12 }}>
-              时间习惯填写目标时间，如 22:30；其他习惯填写数值目标，如 30。
+              {isCurrentMonth
+                ? "本月习惯变更会同步到尚未到来的月份。"
+                : "本次变更仅影响当前月份。"}时间习惯填写目标时间，如 22:30；其他习惯填写数值目标，如 30。
             </p>
           </div>
         </div>
