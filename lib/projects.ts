@@ -397,7 +397,7 @@ export function updateProjectTask(
       ProjectTaskInput,
       "parentId" | "name" | "startDate" | "endDate" | "progress" | "color"
     >
-  >,
+  > & { projectDates?: Pick<ProjectInput, "startDate" | "endDate"> },
 ) {
   const db = getDatabase();
   const current = getProjectTaskById(id);
@@ -414,6 +414,10 @@ export function updateProjectTask(
     return false;
   }
   if (parentId && hasChildTasks(id)) {
+    return false;
+  }
+
+  if (input.projectDates && !validateDateRange(input.projectDates.startDate, input.projectDates.endDate)) {
     return false;
   }
 
@@ -437,7 +441,12 @@ export function updateProjectTask(
       input.color ?? current.color,
       id,
     );
-    extendProjectToIncludeTask(current.projectId, startDate, endDate);
+    if (input.projectDates) {
+      // Undo the task and its automatic project extension together, while respecting other tasks.
+      updateProject(current.projectId, input.projectDates);
+    } else {
+      extendProjectToIncludeTask(current.projectId, startDate, endDate);
+    }
   });
   transaction();
   return true;

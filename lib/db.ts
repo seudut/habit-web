@@ -159,6 +159,18 @@ function createDatabase() {
   `);
 
   migrateSchema(db);
+  // Repair older project ranges once the database is opened; only extend boundaries.
+  db.prepare(`
+    UPDATE projects
+    SET
+      start_date = MIN(start_date, (SELECT MIN(start_date) FROM project_tasks WHERE project_id = projects.id)),
+      end_date = MAX(end_date, (SELECT MAX(end_date) FROM project_tasks WHERE project_id = projects.id))
+    WHERE EXISTS (SELECT 1 FROM project_tasks WHERE project_id = projects.id)
+      AND (
+        start_date > (SELECT MIN(start_date) FROM project_tasks WHERE project_id = projects.id)
+        OR end_date < (SELECT MAX(end_date) FROM project_tasks WHERE project_id = projects.id)
+      )
+  `).run();
   deduplicateWeeklyRecords(db);
   db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_records_task_date

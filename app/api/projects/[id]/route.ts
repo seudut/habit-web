@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
 import {
+  getProjectsData,
   deleteProject,
   getProjectById,
   isValidColor,
@@ -49,7 +50,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const updated = updateProject(id, body);
   return updated
-    ? NextResponse.json({ ok: true })
+    ? NextResponse.json({ ok: true, data: getProjectsData() })
     : NextResponse.json({ error: "项目不存在" }, { status: 404 });
 }
 
@@ -60,6 +61,6 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   return deleteProject(id)
-    ? NextResponse.json({ ok: true })
+    ? NextResponse.json({ ok: true, data: getProjectsData() })
     : NextResponse.json({ error: "项目不存在" }, { status: 404 });
 }

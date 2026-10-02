@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
 import {
+  getProjectsData,
   createProjectTask,
   isValidColor,
   isValidProgress,
@@ -59,5 +60,5 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json({ ok: true, task }, { status: 201 });
+  return NextResponse.json({ ok: true, task, data: getProjectsData() }, { status: 201 });
 }

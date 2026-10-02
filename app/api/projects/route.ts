@@ -54,5 +54,5 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return NextResponse.json({ ok: true, project }, { status: 201 });
+  return NextResponse.json({ ok: true, project, data: getProjectsData() }, { status: 201 });
 }

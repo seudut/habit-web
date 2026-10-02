@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isApiRequestAuthenticated } from "@/lib/auth";
 import {
+  getProjectsData,
   deleteProjectTask,
   getProjectTaskById,
   isValidColor,
@@ -33,6 +34,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     endDate?: string;
     progress?: number;
     color?: string;
+    projectDates?: { startDate: string; endDate: string };
   };
   const startDate = body.startDate ?? current.startDate;
   const endDate = body.endDate ?? current.endDate;
@@ -55,12 +57,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
 
+  if (body.projectDates !== undefined && (
+    !body.projectDates ||
+    !isValidProjectDate(body.projectDates.startDate) ||
+    !isValidProjectDate(body.projectDates.endDate) ||
+    body.projectDates.endDate < body.projectDates.startDate
+  )) {
+    return NextResponse.json({ error: "项目日期范围无效" }, { status: 400 });
+  }
+
   const updated = updateProjectTask(id, {
     ...body,
     progress,
   });
   return updated
-    ? NextResponse.json({ ok: true })
+    ? NextResponse.json({ ok: true, data: getProjectsData() })
     : NextResponse.json(
         { error: "任务或父任务关系无效" },
         { status: 400 },
@@ -74,6 +85,6 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   const { id } = await context.params;
   return deleteProjectTask(id)
-    ? NextResponse.json({ ok: true })
+    ? NextResponse.json({ ok: true, data: getProjectsData() })
     : NextResponse.json({ error: "任务不存在" }, { status: 404 });
 }
