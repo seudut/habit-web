@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode, RefObject } from "react";
 import type { WeeklyData, WeeklyHabit, WeeklyPreferences, WeeklyRecord, WeeklyTask, WeeklyCategory } from "@/lib/weekly-types";
 import { addWeekDays, formatWeeklyDuration as duration, TASK_CATEGORY_LABELS, taskTarget, WEEKDAYS, weeklyStats, weekNumber, weekStartOf } from "@/lib/weekly-utils";
-import { readLegacyWeeklyPreferences } from "@/lib/weekly-legacy";
 import { SAVE_LABELS, useWeeklyAutosave } from "./weekly-autosave";
 import type { SaveRegistry, SaveStatus } from "./weekly-autosave";
 import styles from "./weekly-plan.module.css";
@@ -391,7 +390,7 @@ function WeeklyWorkspace({
       budgetMinutes: value.budgetMinutes,
       habits: value.habits
     });
-  }, validPreferences);
+  }, validPreferences, initialData.preferences.initialized);
   const prefs = preferences.value;
   const stats = weeklyStats(data);
   const totalEstimated = data.tasks.reduce((sum, task) => sum + task.estimatedDuration * Math.max(taskTarget(task), data.records.filter(record => record.scheduleTaskId === task.id).length), 0);
@@ -417,25 +416,12 @@ function WeeklyWorkspace({
     setImporting(true);
     setImportError("");
     try {
-      const legacy = readLegacyWeeklyPreferences(week);
-      const draft = preferences.current.current;
-      const hasDraft = JSON.stringify(draft) !== JSON.stringify(initialData.preferences);
       importRequest.current ??= request("/api/weekly/preferences", "PATCH", {
         weekStart: week,
-        onlyIfEmpty: true,
-        ...(hasDraft ? {
-          review: draft.review,
-          budgetMinutes: draft.budgetMinutes,
-          habits: draft.habits
-        } : legacy)
+        onlyIfEmpty: true
       });
       const result = await importRequest.current;
       preferences.reset(result.preferences);
-      try {
-        if (localStorage.getItem("weekly-daily-habit-checks") && !localStorage.getItem(`weekly-daily-habit-checks-${week}`) && !localStorage.getItem("weekly-legacy-checks-imported-week")) {
-          localStorage.setItem("weekly-legacy-checks-imported-week", week);
-        }
-      } catch {/* Legacy browser data stays intact. */}
     } catch (error) {
       importRequest.current = null;
       setImportError(error instanceof Error ? error.message : "初始化失败");

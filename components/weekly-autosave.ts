@@ -11,7 +11,7 @@ export const SAVE_LABELS: Record<SaveStatus, string> = {
 };
 
 // Serialize writes and keep newer edits queued while a request is in flight.
-export function useWeeklyAutosave<T>(initial: T, key: string, registry: SaveRegistry, save: (value: T) => Promise<void>, validate: (value: unknown) => value is T) {
+export function useWeeklyAutosave<T>(initial: T, key: string, registry: SaveRegistry, save: (value: T) => Promise<void>, validate: (value: unknown) => value is T, restoreDraft = true) {
   const [value, setValue] = useState(initial);
   const [status, setStatus] = useState<SaveStatus>("saved");
   const current = useRef(initial);
@@ -78,13 +78,15 @@ export function useWeeklyAutosave<T>(initial: T, key: string, registry: SaveRegi
   useEffect(() => {
     mounted.current = true;
     registry.set(key, () => flushRef.current());
-    try {
-      const draft = localStorage.getItem(key);
-      if (draft) {
-        const parsed: unknown = JSON.parse(draft);
-        if (validate(parsed) && JSON.stringify(parsed) !== saved.current) change(parsed);
-      }
-    } catch {/* Ignore unreadable browser drafts. */}
+    if (restoreDraft) {
+      try {
+        const draft = localStorage.getItem(key);
+        if (draft) {
+          const parsed: unknown = JSON.parse(draft);
+          if (validate(parsed) && JSON.stringify(parsed) !== saved.current) change(parsed);
+        }
+      } catch {/* Ignore unreadable browser drafts. */}
+    }
     const onUnload = (event: BeforeUnloadEvent) => {
       if (JSON.stringify(current.current) !== saved.current) event.preventDefault();
     };
@@ -98,7 +100,7 @@ export function useWeeklyAutosave<T>(initial: T, key: string, registry: SaveRegi
     };
     // The workspace is remounted for each week; these are stable identities.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, registry]);
+  }, [key, registry, restoreDraft]);
   return {
     value,
     change,
