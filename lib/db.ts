@@ -119,6 +119,19 @@ function createDatabase() {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS weekly_preferences (
+      week_start TEXT PRIMARY KEY,
+      review TEXT NOT NULL DEFAULT '',
+      budget_minutes REAL NOT NULL DEFAULT 2940,
+      habits_json TEXT NOT NULL DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS weekly_plan_transfers (
+      source_task_id TEXT NOT NULL,
+      target_week_start TEXT NOT NULL,
+      PRIMARY KEY (source_task_id, target_week_start)
+    );
+
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -159,6 +172,11 @@ function createDatabase() {
   `);
 
   migrateSchema(db);
+  const weeklyColumns = db.prepare("PRAGMA table_info(weekly_schedule_tasks)").all() as Array<{ name: string }>;
+  if (!weeklyColumns.some((column) => column.name === "target_count")) {
+    db.exec("ALTER TABLE weekly_schedule_tasks ADD COLUMN target_count INTEGER NOT NULL DEFAULT 1");
+    db.prepare("UPDATE weekly_schedule_tasks SET target_count = 7 WHERE task_type = 'daily'").run();
+  }
   // Repair older project ranges once the database is opened; only extend boundaries.
   db.prepare(`
     UPDATE projects
